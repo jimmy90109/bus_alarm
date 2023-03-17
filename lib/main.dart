@@ -84,6 +84,9 @@ class _MyAppState extends State<MyApp> {
                         onMapCreated: _onMapCreated,
                         compassEnabled: false,
                         zoomControlsEnabled: false,
+                        zoomGesturesEnabled: false,
+                        //scrollGesturesEnabled: false,
+                        rotateGesturesEnabled: false,
                         initialCameraPosition: CameraPosition(
                             target: _center,
                             zoom: 20.0,
