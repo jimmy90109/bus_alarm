@@ -1,10 +1,15 @@
-# 畢業專題 - 公車定位鬧鐘APP
+# 畢業專題 - 公車定位鬧鐘APP  
 
-UI設計  
-https://www.figma.com/proto/clo1boyJskf7hxhSgp7uKp/%E5%88%B0%E7%AB%99%E6%8F%90%E9%86%92APP?page-id=0%3A1&node-id=212-80&viewport=-10%2C-632%2C0.71&scaling=scale-down&starting-point-node-id=3%3A4  
+藉由到站下車APP，實時的手機定位資訊，不會再因為塞車而需要再設另一個鬧鐘、到站時的連續震動除非使用者關閉，否則會繼續震動，確保使用者已經確實從睡夢中清醒過來，讓通勤族不會再睡得提心吊膽，大大提升在交通工具上的睡眠品質。  
 
+--  
 
-4/9 updated
+UI設計 -> <a href="https://www.youtube.com](https://www.figma.com/proto/clo1boyJskf7hxhSgp7uKp/%E5%88%B0%E7%AB%99%E6%8F%90%E9%86%92APP?page-id=0%3A1&node-id=212-80&viewport=-10%2C-632%2C0.71&scaling=scale-down&starting-point-node-id=3%3A4/">Figma</a>
+
+--  
+
+Flutter實作：
+
 <table>
   <tr>
     <td><img src="./ScreenShots/mainPage.png" width = 150px ></td>
@@ -31,3 +36,4 @@ https://www.figma.com/proto/clo1boyJskf7hxhSgp7uKp/%E5%88%B0%E7%AB%99%E6%8F%90%E
   </tr>
   -->
 </table>
+4/9 updated
