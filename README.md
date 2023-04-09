@@ -4,7 +4,7 @@ UI設計
 https://www.figma.com/proto/clo1boyJskf7hxhSgp7uKp/%E5%88%B0%E7%AB%99%E6%8F%90%E9%86%92APP?page-id=0%3A1&node-id=212-80&viewport=-10%2C-632%2C0.71&scaling=scale-down&starting-point-node-id=3%3A4  
 
 
-4/9
+4/9 updated
 <table>
   <tr>
     <td><img src="./ScreenShots/mainPage.png" width = 150px ></td>
