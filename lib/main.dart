@@ -37,6 +37,9 @@ class _MyAppState extends State<MyApp> {
   final LatLng _center = const LatLng(25.0246, 121.5469);
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
+    rootBundle.loadString('assets/no_markers.json').then((String mapStyle) {
+      controller.setMapStyle(mapStyle);
+    });
   }
 
   @override
@@ -85,7 +88,7 @@ class _MyAppState extends State<MyApp> {
                         compassEnabled: false,
                         zoomControlsEnabled: false,
                         zoomGesturesEnabled: false,
-                        //scrollGesturesEnabled: false,
+                        scrollGesturesEnabled: false,
                         rotateGesturesEnabled: false,
                         initialCameraPosition: CameraPosition(
                             target: _center,
@@ -288,6 +291,16 @@ class _MyAppState extends State<MyApp> {
                         ),
                       ),
                     ),
+                    Positioned(
+                        bottom: 60,
+                        child: Container(
+                            height: 350,
+                            width: MediaQuery.of(context).size.width,
+                            child: Center(
+                                child: Image.asset('assets/bus.png')
+                            )
+                        )
+                    )
                   ],
                 ),
               ),
