@@ -2,9 +2,12 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_map/SearchingPlace.dart';
+import 'package:google_map/database/place_database.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_map/PanelWidget.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
+import 'animation/FadeAnimation.dart';
+import 'model/place.dart';
 
 void main() {
   //transparent the notification & navigation bar
@@ -31,6 +34,7 @@ class _MyAppState extends State<MyApp> {
 
   //siding up panel controller
   final PanelController _pc = PanelController();
+  late String panelState;
 
   //Gmap
   late GoogleMapController mapController;
@@ -40,6 +44,33 @@ class _MyAppState extends State<MyApp> {
     rootBundle.loadString('assets/no_markers.json').then((String mapStyle) {
       controller.setMapStyle(mapStyle);
     });
+  }
+
+  //saved places
+  late List<Place> _placeList;
+  Future readPlaces(String table) async {
+    _placeList = await PlacesDatabase.instance.readAllPlaces(table);
+    setState(() {});
+  }
+  // late List<Place> _hisList;
+  // Future readHisPlaces() async {
+  //   _favList = await PlacesDatabase.instance.readAllPlaces(hisTable);
+  //   setState(() {});
+  // }
+  // late List<Place> _searchList;
+  // Future readSearchPlaces() async {
+  //   _favList = await PlacesDatabase.instance.readAllPlaces(searchTable);
+  //   setState(() {});
+  // }
+
+  @override
+  void initState() {
+    panelState = "hist";
+    readPlaces(favTable);
+    // readFavPlaces();
+    // readHisPlaces();
+    // readSearchPlaces();
+    super.initState();
   }
 
   @override
@@ -61,23 +92,27 @@ class _MyAppState extends State<MyApp> {
             useMaterial3: true,
           ),
           themeMode: ThemeMode.light,
-          home: Builder(builder: (context) {
-            //for dynamic theme
+
+          home: Builder(builder: (context) {//for dynamic theme
             return Scaffold(
               body: SlidingUpPanel(
                 controller: _pc,
                 minHeight: 0,
                 maxHeight: MediaQuery.of(context).size.height * 0.5,
-                margin: EdgeInsets.fromLTRB(15.0, 0, 15.0, 0.0),
+                margin: const EdgeInsets.fromLTRB(15.0, 0, 15.0, 0.0),
                 backdropEnabled: true,
                 backdropTapClosesPanel: true,
                 //defaultPanelState: PanelState.CLOSED,
-
+                color: Theme.of(context)
+                    .colorScheme
+                    .secondaryContainer,
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(30)),
                 panelBuilder: (controller) => Panel(
                   controller: controller,
                   panelController: _pc,
+                  state: panelState,
+                  placeList: _placeList,
                 ),
 
                 body: Stack(
@@ -87,7 +122,7 @@ class _MyAppState extends State<MyApp> {
                         onMapCreated: _onMapCreated,
                         compassEnabled: false,
                         zoomControlsEnabled: false,
-                        zoomGesturesEnabled: false,
+                        //zoomGesturesEnabled: false,
                         scrollGesturesEnabled: false,
                         rotateGesturesEnabled: false,
                         initialCameraPosition: CameraPosition(
@@ -133,7 +168,7 @@ class _MyAppState extends State<MyApp> {
                                     size: 24.0,
                                   ),
                                   Text(
-                                    'Bus Alert',
+                                    '公車鬧鐘',
                                     style: TextStyle(
                                       fontSize: 18,
                                       color: Theme.of(context)
@@ -154,7 +189,7 @@ class _MyAppState extends State<MyApp> {
                       ),
                     ),
                     Positioned(
-                      bottom: 5,
+                      bottom: 15,
                       left: 15,
                       right: 15,
                       child: SafeArea(
@@ -187,6 +222,11 @@ class _MyAppState extends State<MyApp> {
                                     ),
                                   ),
                                   onTap: () {
+                                    readPlaces(hisTable);
+                                    setState(() {
+                                      panelState="hist";
+                                    });
+                                    // deletePlace("test");
                                     _pc.open();
                                   },
                                 )),
@@ -231,7 +271,7 @@ class _MyAppState extends State<MyApp> {
                                             //),
                                             SizedBox(width: 5),
                                             Text(
-                                              'Search',
+                                              '搜尋',
                                               style: TextStyle(
                                                 fontSize: 18,
                                                 color: Theme.of(context)
@@ -244,13 +284,15 @@ class _MyAppState extends State<MyApp> {
                                       ),
                                     ),
                                     onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        new MaterialPageRoute(
-                                          builder: (context) =>
-                                              new SearchingPlace(),
-                                        ),
-                                      );
+                                      Navigator.of(context).push(CustomPageRoute(SearchingPlace()));
+
+                                      // Navigator.push(
+                                      //   context,
+                                      //   new MaterialPageRoute(
+                                      //     builder: (context) =>
+                                      //         new SearchingPlace(),
+                                      //   ),
+                                      // );
                                     },
                                   )),
                             ),
@@ -284,6 +326,17 @@ class _MyAppState extends State<MyApp> {
                                     ),
                                   ),
                                   onTap: () {
+                                    // Place temp = Place(
+                                    //   id: "test",
+                                    //   name: 'test..!',
+                                    //   lat: 35.2,
+                                    //   lng: 11.22,
+                                    // );
+                                    // insertPlace(temp);
+                                    readPlaces(favTable);
+                                    setState(() {
+                                      panelState="fav";
+                                    });
                                     _pc.open();
                                   },
                                 )),

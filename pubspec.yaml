@@ -43,6 +43,8 @@ dependencies:
   sliding_up_panel: ^2.0.0+1
   uuid: ^3.0.7
   http: ^0.13.5
+  sqflite: ^2.2.8
+  path: any
 
 dev_dependencies:
   flutter_test:

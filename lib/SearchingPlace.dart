@@ -34,19 +34,20 @@ class _SearchingPlaceState extends State<SearchingPlace> {
   }
 
   void _TextOnChanged() {
-    if (_sessionToken == null) {
-      setState(() {
-        _sessionToken = uuid.v4();
+    if (tc.text != "") {
+      if (_sessionToken == null) {
+        setState(() {
+          _sessionToken = uuid.v4();
+        });
+      }
+      if (_debounced?.isActive ?? false) _debounced!.cancel();
+      _debounced = Timer(const Duration(milliseconds: 1000), () {
+        getSuggestion(tc.text);
       });
     }
-    if (_debounced?.isActive ?? false) _debounced!.cancel();
-    _debounced = Timer(const Duration(milliseconds: 1000), () {
-      getSuggestion(tc.text);
-    });
   }
 
   void getSuggestion(String input) async {
-
     String baseURL =
         "https://maps.googleapis.com/maps/api/place/autocomplete/json";
     String request = '$baseURL'
@@ -143,40 +144,58 @@ class _SearchingPlaceState extends State<SearchingPlace> {
                                                     .onPrimaryContainer,
                                                 size: 24.0,
                                               ),
-                                              title: Text(
-                                                  _placeList[index]["description"]),
+                                              title: Text(_placeList[index]
+                                                  ["description"]),
                                               onTap: () async {
                                                 final placeId =
-                                                    _placeList[index]["place_id"];
+                                                    _placeList[index]
+                                                        ["place_id"];
                                                 print(placeId);
                                                 var response = await http.get(Uri.parse(
                                                     'https://maps.googleapis.com/maps/api/place/details/json'
                                                     '?place_id=$placeId'
                                                     '&language=zh-TW'
                                                     '&fields=place_id,name,geometry'
-                                                    '&key=$kPLACES_API_KEY'
-                                                ));
-                                                if (response.statusCode == 200) {
+                                                    '&key=$kPLACES_API_KEY'));
+                                                if (response.statusCode ==
+                                                    200) {
                                                   //json.decode(response.body)['result']
-                                                  print(response.body.toString());
-                                                  var place = json.decode(response.body)['result'];
+                                                  print(
+                                                      response.body.toString());
+                                                  var place = json.decode(
+                                                      response.body)['result'];
                                                   print(place['name']);
                                                   print(place['place_id']);
-                                                  print(place['geometry']['location']['lat']);
-                                                  print(place['geometry']['location']['lng']);
+                                                  print(place['geometry']
+                                                      ['location']['lat']);
+                                                  print(place['geometry']
+                                                      ['location']['lng']);
 
                                                   Navigator.push(
                                                     context,
                                                     new MaterialPageRoute(
                                                       builder: (context) =>
-                                                      new Confirming(place_name: place['name'], place_id: place['place_id'], place_lat: place['geometry']['location']['lat'], place_lng: place['geometry']['location']['lng']),
+                                                          new Confirming(
+                                                              place_name:
+                                                                  place['name'],
+                                                              place_id: place[
+                                                                  'place_id'],
+                                                              place_lat: place[
+                                                                          'geometry']
+                                                                      [
+                                                                      'location']
+                                                                  ['lat'],
+                                                              place_lng: place[
+                                                                          'geometry']
+                                                                      [
+                                                                      'location']
+                                                                  ['lng']),
                                                     ),
                                                   );
-
                                                 } else {
-                                                  throw Exception('Failed to load predictions');
+                                                  throw Exception(
+                                                      'Failed to load predictions');
                                                 }
-
                                               },
                                             ),
                                           ),
@@ -187,7 +206,7 @@ class _SearchingPlaceState extends State<SearchingPlace> {
                                       },
                                     )
                                   : Center(
-                                      child: Text("(search a place)"),
+                                      child: Text("(搜尋結果)"),
                                     )),
                         ),
                         Expanded(
@@ -210,7 +229,7 @@ class _SearchingPlaceState extends State<SearchingPlace> {
                                     controller: tc,
                                     //autofocus: true,
                                     decoration: InputDecoration(
-                                      hintText: 'Search...',
+                                      hintText: '搜尋...',
                                       suffixIcon: IconButton(
                                         onPressed: () {
                                           Navigator.pop(context);
