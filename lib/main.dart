@@ -1,21 +1,24 @@
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_map/SearchingPlace.dart';
 import 'package:google_map/database/place_database.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_map/PanelWidget.dart';
+import 'package:location/location.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 import 'animation/FadeAnimation.dart';
 import 'model/place.dart';
+import 'dart:developer' as developer;
 
 void main() {
   //transparent the notification & navigation bar
-  SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     systemNavigationBarColor: Colors.transparent,
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
-    systemNavigationBarIconBrightness: Brightness.dark,
+    systemNavigationBarIconBrightness: Brightness.light,
   ));
   runApp(MyApp());
 }
@@ -38,12 +41,75 @@ class _MyAppState extends State<MyApp> {
 
   //Gmap
   late GoogleMapController mapController;
-  final LatLng _center = const LatLng(25.0246, 121.5469);
+  final LatLng _center = const LatLng(25.047058, 121.519752);
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
     rootBundle.loadString('assets/no_markers.json').then((String mapStyle) {
       controller.setMapStyle(mapStyle);
     });
+  }
+
+  //get current location
+  Location location = Location();
+  late bool _serviceEnabled;
+  late PermissionStatus _permissionGranted;
+  LocationData? _currentLocation;
+  LocationData? _lastLocation;
+  double bearing = 0;
+
+  void getCurrentLocation() async {
+    _serviceEnabled = await location.serviceEnabled();
+    if (!_serviceEnabled) {
+      _serviceEnabled = await location.requestService();
+      if (!_serviceEnabled) {
+        return;
+      }
+    }
+
+    _permissionGranted = await location.hasPermission();
+    if (_permissionGranted == PermissionStatus.denied) {
+      _permissionGranted = await location.requestPermission();
+      if (_permissionGranted != PermissionStatus.granted) {
+        return;
+      }
+    }
+
+    location.getLocation().then(
+      (location) {
+        _currentLocation = location;
+      },
+    );
+
+    await location.changeSettings(interval: 1000, distanceFilter: 50);
+
+    location.onLocationChanged.listen(
+      (newLoc) {
+        developer.log("location updated!", name: 'location');
+        if (_currentLocation == null) {
+          _currentLocation = newLoc;
+          setState(() {});
+        } else {
+          _lastLocation = _currentLocation;
+          _currentLocation = newLoc;
+          bearing = Geolocator.bearingBetween(_lastLocation!.latitude!,
+              _lastLocation!.longitude!, newLoc.latitude!, newLoc.longitude!);
+          setState(() {});
+        }
+        mapController.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: LatLng(
+                newLoc.latitude!,
+                newLoc.longitude!,
+              ),
+              zoom: 18.0,
+              tilt: 90,
+              bearing: bearing,
+            ),
+          ),
+        );
+      },
+    );
   }
 
   //saved places
@@ -52,24 +118,13 @@ class _MyAppState extends State<MyApp> {
     _placeList = await PlacesDatabase.instance.readAllPlaces(table);
     setState(() {});
   }
-  // late List<Place> _hisList;
-  // Future readHisPlaces() async {
-  //   _favList = await PlacesDatabase.instance.readAllPlaces(hisTable);
-  //   setState(() {});
-  // }
-  // late List<Place> _searchList;
-  // Future readSearchPlaces() async {
-  //   _favList = await PlacesDatabase.instance.readAllPlaces(searchTable);
-  //   setState(() {});
-  // }
 
   @override
   void initState() {
     panelState = "hist";
+    _placeList = [];
     readPlaces(favTable);
-    // readFavPlaces();
-    // readHisPlaces();
-    // readSearchPlaces();
+    getCurrentLocation();
     super.initState();
   }
 
@@ -92,8 +147,8 @@ class _MyAppState extends State<MyApp> {
             useMaterial3: true,
           ),
           themeMode: ThemeMode.light,
-
-          home: Builder(builder: (context) {//for dynamic theme
+          home: Builder(builder: (context) {
+            //for dynamic theme
             return Scaffold(
               body: SlidingUpPanel(
                 controller: _pc,
@@ -103,9 +158,7 @@ class _MyAppState extends State<MyApp> {
                 backdropEnabled: true,
                 backdropTapClosesPanel: true,
                 //defaultPanelState: PanelState.CLOSED,
-                color: Theme.of(context)
-                    .colorScheme
-                    .secondaryContainer,
+                color: Theme.of(context).colorScheme.secondaryContainer,
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(30)),
                 panelBuilder: (controller) => Panel(
@@ -122,16 +175,43 @@ class _MyAppState extends State<MyApp> {
                         onMapCreated: _onMapCreated,
                         compassEnabled: false,
                         zoomControlsEnabled: false,
-                        //zoomGesturesEnabled: false,
+                        zoomGesturesEnabled: false,
                         scrollGesturesEnabled: false,
+                        tiltGesturesEnabled: false,
                         rotateGesturesEnabled: false,
+                        buildingsEnabled: false,
+                        //padding: const EdgeInsets.fromLTRB(0, 320, 0, 0),
                         initialCameraPosition: CameraPosition(
-                            target: _center,
-                            zoom: 20.0,
-                            bearing: -85,
-                            tilt: 90),
+                          target: _center,
+                          zoom: 12.0,
+                          //bearing: -85,
+                          //tilt: 90
+                        ),
                       ),
                     ),
+                    Visibility(
+                        visible: _currentLocation == null,
+                        child: Positioned.fill(
+                          child: Container(
+                            color: Colors.black.withOpacity(0.6),
+                            child: const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.warning_rounded,
+                                    size: 100,
+                                    color: Colors.white,
+                                  ),
+                                  Text(
+                                    "（正在讀取GPS...）",
+                                    style: TextStyle(color: Colors.white),
+                                  )
+                                ],
+                              ),
+                            ),
+                          ),
+                        )),
                     Positioned(
                       top: 10,
                       left: 15,
@@ -194,166 +274,172 @@ class _MyAppState extends State<MyApp> {
                       right: 15,
                       child: SafeArea(
                         child: Container(
-                          child: Row(children: <Widget>[
-                            Material(
-                                elevation: 20,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30)),
-                                child: InkWell(
-                                  customBorder: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30)),
-                                  child: Ink(
-                                    height: 60,
-                                    width: 60,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(30),
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .secondaryContainer,
-                                    ),
-                                    child: Center(
-                                      child: Icon(
-                                        Icons.access_time_outlined,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSecondaryContainer,
-                                        size: 24.0,
-                                      ),
-                                    ),
-                                  ),
-                                  onTap: () {
-                                    readPlaces(hisTable);
-                                    setState(() {
-                                      panelState="hist";
-                                    });
-                                    // deletePlace("test");
-                                    _pc.open();
-                                  },
-                                )),
-                            Spacer(),
-                            Hero(
-                              tag: 'searchingHero',
-                              child: Material(
-                                  elevation: 20,
-                                  //type: MaterialType.transparency,
-                                  //color: Colors.transparent,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                  child: InkWell(
-                                    customBorder: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                    ),
-                                    child: Ink(
-                                      height: 60,
-                                      width: 180,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(30),
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primaryContainer,
-                                      ),
+                          child: Column(
+                              children: <Widget>[
+                                Visibility(
+                                  visible: _currentLocation != null,
+                                  child: Container(
+                                      height: 350,
+                                      width: MediaQuery.of(context).size.width,
                                       child: Center(
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: <Widget>[
-                                            // Hero(
-                                            //   tag: 'sIcon',
-                                            //   child:
-                                            Icon(
-                                              Icons.search,
+                                          child: Image.asset('assets/bus.png'))),
+                                ),
+                                Row(children: <Widget>[
+                                  Material(
+                                      elevation: 20,
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(30)),
+                                      child: InkWell(
+                                        customBorder: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(30)),
+                                        child: Ink(
+                                          height: 60,
+                                          width: 60,
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(30),
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .secondaryContainer,
+                                          ),
+                                          child: Center(
+                                            child: Icon(
+                                              Icons.access_time_outlined,
                                               color: Theme.of(context)
                                                   .colorScheme
-                                                  .onPrimaryContainer,
+                                                  .onSecondaryContainer,
                                               size: 24.0,
                                             ),
-                                            //),
-                                            SizedBox(width: 5),
-                                            Text(
-                                              '搜尋',
-                                              style: TextStyle(
-                                                fontSize: 18,
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .onPrimaryContainer,
+                                          ),
+                                        ),
+                                        onTap: () {
+                                          readPlaces(hisTable);
+                                          setState(() {
+                                            panelState = "hist";
+                                          });
+                                          // deletePlace("test");
+                                          _pc.open();
+                                        },
+                                      )),
+                                  Spacer(),
+                                  Hero(
+                                    tag: 'searchingHero',
+                                    child: Material(
+                                        elevation: 20,
+                                        //type: MaterialType.transparency,
+                                        //color: Colors.transparent,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(30),
+                                        ),
+                                        child: InkWell(
+                                          customBorder: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(30),
+                                          ),
+                                          child: Ink(
+                                            height: 60,
+                                            width: 180,
+                                            decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(30),
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .primaryContainer,
+                                            ),
+                                            child: Center(
+                                              child: Row(
+                                                mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                                children: <Widget>[
+                                                  // Hero(
+                                                  //   tag: 'sIcon',
+                                                  //   child:
+                                                  Icon(
+                                                    Icons.search,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onPrimaryContainer,
+                                                    size: 24.0,
+                                                  ),
+                                                  //),
+                                                  SizedBox(width: 5),
+                                                  Text(
+                                                    '搜尋',
+                                                    style: TextStyle(
+                                                      fontSize: 18,
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .onPrimaryContainer,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    onTap: () {
-                                      Navigator.of(context).push(CustomPageRoute(SearchingPlace()));
+                                          ),
+                                          onTap: () {
+                                            Navigator.of(context).push(
+                                                CustomPageRoute(
+                                                    const SearchingPlace()));
 
-                                      // Navigator.push(
-                                      //   context,
-                                      //   new MaterialPageRoute(
-                                      //     builder: (context) =>
-                                      //         new SearchingPlace(),
-                                      //   ),
-                                      // );
-                                    },
-                                  )),
-                            ),
-                            Spacer(),
-                            Material(
-                                elevation: 20,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
-                                child: InkWell(
-                                  customBorder: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
+                                            // Navigator.push(
+                                            //   context,
+                                            //   new MaterialPageRoute(
+                                            //     builder: (context) =>
+                                            //         new SearchingPlace(),
+                                            //   ),
+                                            // );
+                                          },
+                                        )),
                                   ),
-                                  child: Ink(
-                                    height: 60,
-                                    width: 60,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(30),
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .secondaryContainer,
-                                    ),
-                                    child: Center(
-                                      child: Icon(
-                                        Icons.favorite_border_outlined,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSecondaryContainer,
-                                        size: 24.0,
+                                  Spacer(),
+                                  Material(
+                                      elevation: 20,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(30),
                                       ),
-                                    ),
-                                  ),
-                                  onTap: () {
-                                    // Place temp = Place(
-                                    //   id: "test",
-                                    //   name: 'test..!',
-                                    //   lat: 35.2,
-                                    //   lng: 11.22,
-                                    // );
-                                    // insertPlace(temp);
-                                    readPlaces(favTable);
-                                    setState(() {
-                                      panelState="fav";
-                                    });
-                                    _pc.open();
-                                  },
-                                )),
-                          ]),
+                                      child: InkWell(
+                                        customBorder: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(30),
+                                        ),
+                                        child: Ink(
+                                          height: 60,
+                                          width: 60,
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(30),
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .secondaryContainer,
+                                          ),
+                                          child: Center(
+                                            child: Icon(
+                                              Icons.favorite_border_outlined,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSecondaryContainer,
+                                              size: 24.0,
+                                            ),
+                                          ),
+                                        ),
+                                        onTap: () {
+                                          // Place temp = Place(
+                                          //   id: "test",
+                                          //   name: 'test..!',
+                                          //   lat: 35.2,
+                                          //   lng: 11.22,
+                                          // );
+                                          // insertPlace(temp);
+                                          readPlaces(favTable);
+                                          setState(() {
+                                            panelState = "fav";
+                                          });
+                                          _pc.open();
+                                        },
+                                      )),
+                                ])
+                              ]
+
+                          ),
                         ),
                       ),
                     ),
-                    Positioned(
-                        bottom: 60,
-                        child: Container(
-                            height: 350,
-                            width: MediaQuery.of(context).size.width,
-                            child: Center(
-                                child: Image.asset('assets/bus.png')
-                            )
-                        )
-                    )
+
                   ],
                 ),
               ),
