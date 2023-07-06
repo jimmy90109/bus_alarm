@@ -12,8 +12,8 @@ UI設計  -> <a href="https://www.figma.com/proto/clo1boyJskf7hxhSgp7uKp/%E5%88%
 
 --  
 
-Flutter實作：
-
+Flutter實作：  
+4/9
 <table>
   <tr>
     <td><img src="./ScreenShots/mainPage.png" width = 150px ></td>
@@ -40,4 +40,31 @@ Flutter實作：
   </tr>
   -->
 </table>
-4/9 updated
+7/6
+<table>
+  <tr>
+    <td><img src="./ScreenShots/fav_20230706.png" width = 150px ></td>
+    <td><img src="./ScreenShots/searchingPlace_20230706.png" width = 150px></td>
+    <td><img src="./ScreenShots/confirming_20230706.png" width = 150px></td>
+    <td><img src="./ScreenShots/tracking_20230706.png" width = 150px></td>
+  </tr>
+  <tr>
+    <td align="center">• 收藏地點</td>
+    <td align="center">• 搜尋地點</td>
+    <td align="center">• 確認頁面</td>
+    <td align="center">• 追蹤中</td>
+  </tr>
+  <!--
+  <tr>
+    <td><img src="./ScreenShots/DatePicker.jpg" width = 150px ></td>
+    <td><img src="./ScreenShots/noBlank.jpg" width = 150px></td>
+    <td><img src="./ScreenShots/deleteItem.jpg" width = 150px></td>
+  </tr>
+  <tr>
+    <td align="center">• DatePicker</td>
+    <td align="center">• 欄位不可為空白</td>
+    <td align="center">• 點擊項目可以刪除</td>
+  </tr>
+  -->
+</table>
+
