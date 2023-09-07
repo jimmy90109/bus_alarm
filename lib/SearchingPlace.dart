@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:custom_sliding_segmented_control/custom_sliding_segmented_control.dart';
 import 'package:flutter/material.dart';
 import 'package:google_map/Confirming.dart';
 import 'package:uuid/uuid.dart';
 import 'package:http/http.dart' as http;
+import 'dart:developer' as developer;
+
+import 'animation/FadeAnimation.dart';
 
 class SearchingPlace extends StatefulWidget {
   const SearchingPlace({super.key});
@@ -58,7 +62,8 @@ class _SearchingPlaceState extends State<SearchingPlace> {
         '&language=zh-TW';
     var response = await http.get(Uri.parse(request));
 
-    print(response.body.toString());
+    // print(response.body.toString());
+    developer.log(json.decode(response.body).toString(), name: 'placeAPI');
     if (response.statusCode == 200) {
       setState(() {
         _placeList = json.decode(response.body)['predictions'];
@@ -109,6 +114,38 @@ class _SearchingPlaceState extends State<SearchingPlace> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: <Widget>[
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: CustomSlidingSegmentedControl<int>(
+                            initialValue: 1,
+                            // isStretch: true,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.ease,
+                            children: const {
+                              1: Text(' 地點 '),
+                              2: Text(' 公車 '),
+                            },
+                            innerPadding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            thumbDecoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primaryContainer,
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                            onValueChanged: (v) {
+                              // getBuyerChatroom();
+                              // getSellerChatroom();
+                              // setState(() {
+                              //   buyerOrSeller = v;
+                              // });
+                              // print(buyerOrSeller);
+                            },
+                          ),
+                        ),
                         Expanded(
                           flex: 5,
                           child: Container(
@@ -145,7 +182,7 @@ class _SearchingPlaceState extends State<SearchingPlace> {
                                                 size: 24.0,
                                               ),
                                               title: Text(_placeList[index]
-                                                  ["description"]),
+                                                  ["structured_formatting"]["main_text"]),
                                               onTap: () async {
                                                 final placeId =
                                                     _placeList[index]
@@ -171,27 +208,45 @@ class _SearchingPlaceState extends State<SearchingPlace> {
                                                   print(place['geometry']
                                                       ['location']['lng']);
 
-                                                  Navigator.push(
-                                                    context,
-                                                    new MaterialPageRoute(
-                                                      builder: (context) =>
-                                                          new Confirming(
-                                                              place_name:
-                                                                  place['name'],
-                                                              place_id: place[
-                                                                  'place_id'],
-                                                              place_lat: place[
-                                                                          'geometry']
-                                                                      [
-                                                                      'location']
-                                                                  ['lat'],
-                                                              place_lng: place[
-                                                                          'geometry']
-                                                                      [
-                                                                      'location']
-                                                                  ['lng']),
-                                                    ),
-                                                  );
+                                                  Navigator.of(context).push(
+                                                      CustomPageRoute(
+                                                        Confirming(
+                                                            place_name:
+                                                            place['name'],
+                                                            place_id: place[
+                                                            'place_id'],
+                                                            place_lat: place[
+                                                            'geometry']
+                                                            [
+                                                            'location']
+                                                            ['lat'],
+                                                            place_lng: place[
+                                                            'geometry']
+                                                            [
+                                                            'location']
+                                                            ['lng'])));
+
+                                                  // Navigator.push(
+                                                  //   context,
+                                                  //   new MaterialPageRoute(
+                                                  //     builder: (context) =>
+                                                  //         new Confirming(
+                                                  //             place_name:
+                                                  //                 place['name'],
+                                                  //             place_id: place[
+                                                  //                 'place_id'],
+                                                  //             place_lat: place[
+                                                  //                         'geometry']
+                                                  //                     [
+                                                  //                     'location']
+                                                  //                 ['lat'],
+                                                  //             place_lng: place[
+                                                  //                         'geometry']
+                                                  //                     [
+                                                  //                     'location']
+                                                  //                 ['lng']),
+                                                  //   ),
+                                                  // );
                                                 } else {
                                                   throw Exception(
                                                       'Failed to load predictions');
@@ -202,17 +257,17 @@ class _SearchingPlaceState extends State<SearchingPlace> {
                                         );
                                       },
                                       separatorBuilder: (context, index) {
-                                        return Divider();
+                                        return const Divider();
                                       },
                                     )
-                                  : Center(
+                                  : const Center(
                                       child: Text("(搜尋結果)"),
                                     )),
                         ),
-                        Expanded(
-                          flex: 1,
-                          child: Padding(
-                            padding: EdgeInsets.fromLTRB(30.0, 0.0, 30.0, 10.0),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(30.0, 0.0, 30.0, 10.0),
+                          child: Container(
+                            height: 80,
                             child: Row(
                               children: <Widget>[
                                 Icon(
@@ -222,9 +277,10 @@ class _SearchingPlaceState extends State<SearchingPlace> {
                                       .onPrimaryContainer,
                                   size: 24.0,
                                 ),
-                                SizedBox(width: 8),
+                                const SizedBox(width: 8),
                                 Expanded(
                                   child: TextField(
+                                    // cursorHeight: 20,
                                     //focusNode: focusNode,
                                     controller: tc,
                                     //autofocus: true,
@@ -234,7 +290,7 @@ class _SearchingPlaceState extends State<SearchingPlace> {
                                         onPressed: () {
                                           Navigator.pop(context);
                                         },
-                                        icon: Icon(Icons.cancel_outlined),
+                                        icon: const Icon(Icons.cancel_outlined),
                                       ),
                                     ),
 

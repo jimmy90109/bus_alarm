@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:google_map/database/place_database.dart';
+import 'package:google_map/util/toast.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
-import 'map_util.dart';
+import 'package:location/location.dart';
+import 'util/map_util.dart';
 import 'model/place.dart';
+import 'dart:developer' as developer;
+import 'package:geolocator/geolocator.dart';
 
 class Confirming extends StatefulWidget {
   final String place_name;
@@ -30,6 +34,7 @@ class _ConfirmingState extends State<Confirming> {
   late GoogleMapController mapController;
   late LatLng _center;
   Set<Circle> circles = {};
+  BitmapDescriptor markerIcon = BitmapDescriptor.defaultMarker;
   Map<MarkerId, Marker> markers = {};
   Map<PolylineId, Polyline> polylines = {};
   List<LatLng> polylineCoordinates = [];
@@ -38,10 +43,13 @@ class _ConfirmingState extends State<Confirming> {
 
   //plist
   late List<Place> _placeList;
+  bool _faved = false;
 
   Future readPlaces() async {
     _placeList = await PlacesDatabase.instance.readAllPlaces(favTable);
     setState(() {});
+    developer.log(_placeList.toString(), name: 'placeFav');
+    checkFav();
   }
 
   Future insertPlace(Place place) async {
@@ -54,21 +62,42 @@ class _ConfirmingState extends State<Confirming> {
     readPlaces();
   }
 
+  checkFav() {
+    try {
+      _placeList.firstWhere((place) => place.name == widget.place_name);
+      setState(() {
+        _faved = true;
+      });
+      //developer.log(_faved.toString(), name: 'placeFav');
+    } catch (error) {
+      setState(() {
+        _faved = false;
+      });
+      //developer.log(_faved.toString(), name: 'placeFav');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _center = LatLng(widget.place_lat, widget.place_lng);
     _addMarker(LatLng(widget.place_lat, widget.place_lng), "destination",
         BitmapDescriptor.defaultMarker);
-    circles = {Circle(
-      circleId: const CircleId("destination"),
-      center: LatLng(widget.place_lat, widget.place_lng),
-      radius: 500,
-      strokeWidth: 0,
-      fillColor: Colors.grey.withOpacity(0.3),
-    )};
+    addCustomIcon();
+    circles = {
+      Circle(
+        circleId: const CircleId("destination"),
+        center: LatLng(widget.place_lat, widget.place_lng),
+        radius: 500,
+        strokeWidth: 0,
+        fillColor: Colors.grey.withOpacity(0.3),
+      )
+    };
+
+    getCurrentLocation();
 
     readPlaces();
+    // checkFav();
   }
 
   _addMarker(LatLng position, String id, BitmapDescriptor descriptor) {
@@ -78,29 +107,40 @@ class _ConfirmingState extends State<Confirming> {
     markers[markerId] = marker;
   }
 
+  void addCustomIcon() {
+    BitmapDescriptor.fromAssetImage(
+            const ImageConfiguration(), "assets/bus.png")
+        .then(
+      (icon) {
+        setState(() {
+          markerIcon = icon;
+        });
+      },
+    );
+  }
+
   _addPolyLine() {
     PolylineId id = const PolylineId("poly");
     Polyline polyline = Polyline(
         polylineId: id,
         color: Colors.grey.shade600,
         points: polylineCoordinates,
-        width: 5
-    );
+        width: 5);
     polylines[id] = polyline;
-    //print(polylines[PolylineId("poly")]?.polylineId);
     setState(() {});
   }
 
   _getPolyline() async {
     PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
         googleAPiKey,
-        const PointLatLng(25.0246, 121.5469),
+        PointLatLng(_currentLocation!.latitude!, _currentLocation!.longitude!),
         PointLatLng(widget.place_lat, widget.place_lng),
         travelMode: TravelMode.driving);
+    polylineCoordinates.clear();
     if (result.points.isNotEmpty) {
-      result.points.forEach((PointLatLng point) {
+      for (var point in result.points) {
         polylineCoordinates.add(LatLng(point.latitude, point.longitude));
-      });
+      }
     }
     _addPolyLine();
   }
@@ -116,6 +156,75 @@ class _ConfirmingState extends State<Confirming> {
     });
   }
 
+  //get current location
+  Location location = Location();
+  LocationData? _currentLocation;
+
+  void getCurrentLocation() async {
+    location.getLocation().then(
+          (location) {
+        _currentLocation = location;
+      },
+    );
+
+    await location.changeSettings(interval: 1000, distanceFilter: 50);
+
+    location.onLocationChanged.listen(
+          (newLoc) {
+            if(_tracking){
+              developer.log("location updated!", name: 'location');
+              _currentLocation = newLoc;
+              updatedGPS(newLoc);
+              setState(() {});
+            }
+      },
+    );
+  }
+
+  updatedGPS(LocationData location){
+    polylines.remove(const PolylineId("poly"));
+    _getPolyline();
+    markers.remove(const MarkerId("user"));
+
+    //bus.png's position is a little too high
+    double busLat =
+        (widget.place_lat - location.latitude!) * -0.1 +
+            location.latitude!;
+    double busLng =
+        (widget.place_lng - _currentLocation!.longitude!) * -0.1 +
+            _currentLocation!.longitude!;
+
+    //custom marker: bus
+    _addMarker(
+        LatLng(busLat, busLng), "user", markerIcon);
+
+    //calculate the compass
+    double calculatedRotation =
+    Geolocator.bearingBetween(location.latitude!, location.longitude!,
+        widget.place_lat, widget.place_lng);
+
+    //let the map move down a bit
+    double calculatedLat =
+        (widget.place_lat - location.latitude!) * 0.2 +
+            location.latitude!;
+    double calculatedLng =
+        (widget.place_lng - location.longitude!) * 0.2 +
+            location.longitude!;
+
+    //new CameraPosition
+    mapController.animateCamera(
+        CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: LatLng(calculatedLat, calculatedLng),
+              zoom: 16.0,
+              tilt: 90,
+              bearing: calculatedRotation,
+            )));
+
+    setState(() {});
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -126,18 +235,20 @@ class _ConfirmingState extends State<Confirming> {
               onMapCreated: _onMapCreated,
               compassEnabled: false,
               zoomControlsEnabled: false,
-              //zoomGesturesEnabled: false,
-              //scrollGesturesEnabled: false,
+              // zoomGesturesEnabled: false,
+              // scrollGesturesEnabled: false,
               rotateGesturesEnabled: false,
               markers: Set<Marker>.of(markers.values),
               polylines: Set<Polyline>.of(polylines.values),
               circles: circles,
+              // padding: const EdgeInsets.fromLTRB(0, 320, 0, 0),
               initialCameraPosition: CameraPosition(
                 target: _center,
                 zoom: 16.0,
                 bearing: 0,
-                //tilt: 90
+                // tilt: 90
               ),
+
             ),
           ),
           Positioned(
@@ -226,33 +337,42 @@ class _ConfirmingState extends State<Confirming> {
                                         type: MaterialType.transparency,
                                         child: InkWell(
                                           customBorder: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(30)),
+                                              borderRadius:
+                                                  BorderRadius.circular(30)),
                                           child: Ink(
                                             height: 40,
                                             width: 40,
                                             child: Icon(
-                                              Icons.favorite_border_outlined,
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSecondaryContainer,
+                                              _faved
+                                                  ? Icons.favorite_outlined
+                                                  : Icons
+                                                      .favorite_border_outlined,
+                                              color: _faved
+                                                  ? Colors.red[700]
+                                                  : Theme.of(context)
+                                                      .colorScheme
+                                                      .onSecondaryContainer,
                                               size: 24.0,
                                             ),
                                           ),
                                           onTap: () {
-                                            try{
-                                              _placeList.firstWhere((place) => place.name == widget.place_name);
-                                              print("unfaved!");
+                                            if (_faved) {
                                               deletePlace(widget.place_id);
-                                            }catch(error){
-                                              print("faved!");
-                                              insertPlace(
-                                                  Place(
-                                                    id: widget.place_id,
-                                                    name: widget.place_name,
-                                                    lat: widget.place_lat,
-                                                    lng: widget.place_lng,
-                                                  )
-                                              );
+                                              warning("已移除收藏！");
+                                              setState(() {
+                                                _faved = false;
+                                              });
+                                            } else {
+                                              insertPlace(Place(
+                                                id: widget.place_id,
+                                                name: widget.place_name,
+                                                lat: widget.place_lat,
+                                                lng: widget.place_lng,
+                                              ));
+                                              warning("已收藏地點！");
+                                              setState(() {
+                                                _faved = true;
+                                              });
                                             }
                                             // if(){
                                             //   print("faved!");
@@ -337,24 +457,26 @@ class _ConfirmingState extends State<Confirming> {
                                 ),
                               ),
                               onTap: () {
-                                _addMarker(const LatLng(25.0246, 121.5469), "user",
-                                    BitmapDescriptor.defaultMarkerWithHue(200));
-                                mapController.animateCamera(
-                                    CameraUpdate.newLatLngBounds(
-                                        MapUtils.boundsFromLatLngList(markers
-                                            .values
-                                            .map((e) => e.position)
-                                            .toList()),
-                                        1));
-                                if(polylines[const PolylineId("poly")]==null) {
+                                updatedGPS(_currentLocation!);
+
+                                    // CameraUpdate.newLatLngBounds(
+                                    //     MapUtils.boundsFromLatLngList(markers
+                                    //         .values
+                                    //         .map((e) => e.position)
+                                    //         .toList()),
+                                    //     1)
+
+                                // if (polylines[const PolylineId("poly")] ==
+                                //     null) {
                                   _getPolyline();
-                                } else{
-                                  polylines[const PolylineId("poly")]=Polyline(
-                                      polylineId: const PolylineId("poly"),
-                                      color: Colors.grey.shade600,
-                                      width: 5,
-                                      points: polylineCoordinates);
-                                }
+                                // } else {
+                                //   polylines[const PolylineId("poly")] =
+                                //       Polyline(
+                                //           polylineId: const PolylineId("poly"),
+                                //           color: Colors.grey.shade600,
+                                //           width: 5,
+                                //           points: polylineCoordinates);
+                                // }
                                 setState(() {
                                   _tracking = true;
                                 });
@@ -400,11 +522,12 @@ class _ConfirmingState extends State<Confirming> {
                             ),
                             onTap: () {
                               if (_tracking) {
-                                polylines[const PolylineId("poly")]=Polyline(
-                                    polylineId: const PolylineId("poly"),
-                                    color: Colors.transparent,
-                                    width: 5,
-                                    points: polylineCoordinates);
+                                // polylines[const PolylineId("poly")] = Polyline(
+                                //     polylineId: const PolylineId("poly"),
+                                //     color: Colors.transparent,
+                                //     width: 5,
+                                //     points: polylineCoordinates);
+                                polylines.remove(const PolylineId("poly"));
                                 markers.remove(const MarkerId("user"));
                                 setState(() {
                                   _tracking = false;
@@ -414,6 +537,8 @@ class _ConfirmingState extends State<Confirming> {
                                         CameraPosition(
                                   target: _center,
                                   zoom: 16.0,
+                                  bearing: 0,
+                                  tilt: 0,
                                 )));
                               } else {
                                 Navigator.pop(context);
