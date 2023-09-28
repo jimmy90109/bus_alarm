@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
@@ -11,45 +12,52 @@ import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:location/location.dart';
 // import 'util/map_util.dart';
 import 'model/place.dart';
+import 'package:http/http.dart' as http;
 import 'dart:developer' as developer;
 import 'package:geolocator/geolocator.dart';
 
-class Confirming extends StatefulWidget {
-  final String place_name;
-  final String place_id;
-  final double place_lat;
-  final double place_lng;
+class BusConfirm extends StatefulWidget {
+  final String bus_route;
+  final String bus_token;
 
-  const Confirming(
-      {super.key,
-      required this.place_name,
-      required this.place_id,
-      required this.place_lat,
-      required this.place_lng});
+  const BusConfirm({
+    super.key,
+    required this.bus_route,
+    required this.bus_token,
+  });
 
   @override
-  State<Confirming> createState() => _ConfirmingState();
+  State<BusConfirm> createState() => _BusConfirmState();
 }
 
-class _ConfirmingState extends State<Confirming> {
+class _BusConfirmState extends State<BusConfirm> {
   var _tracking = false;
 
   //Gmap
   bool showMap = false;
   bool loading = true;
   late GoogleMapController mapController;
-  late LatLng _center;
   Set<Circle> circles = {};
-  BitmapDescriptor markerIcon = BitmapDescriptor.defaultMarker;
+  BitmapDescriptor trackingMarker = BitmapDescriptor.defaultMarker;
+  BitmapDescriptor confirmingMarker = BitmapDescriptor.defaultMarker;
   Map<MarkerId, Marker> markers = {};
   List<LatLng> polylineCoordinates = [];
   PolylinePoints polylinePoints = PolylinePoints();
   Map<PolylineId, Polyline> polylines = {};
   String googleAPiKey = "AIzaSyBu6yKj0QDgRglC0Ns-yx_FIUgGBOueh4Q";
 
-  //plist
-  late List<Place> _placeList;
+  //fav list
+  late List<Place> _favList;
   bool _faved = false;
+
+  //bus stop list
+  List<dynamic> _stopList0 = [], _stopList1 = [];
+  List<dynamic> _stopList0Time = [], _stopList1Time = [];
+
+  late LatLng _centerLatLong;
+  late String _centerName, _centerID;
+
+  late Future<LatLng> future;
 
   //get current location
   Location location = Location();
@@ -59,37 +67,29 @@ class _ConfirmingState extends State<Confirming> {
   void initState() {
     super.initState();
 
-    Future.delayed(const Duration(milliseconds: 250), () {
-      setState(() {
-        showMap = true;
-      });
-    });
-
-    _center = LatLng(widget.place_lat, widget.place_lng);
-    _addMarker(LatLng(widget.place_lat, widget.place_lng), "destination",
-        BitmapDescriptor.defaultMarker);
     addCustomIcon();
-    circles = {
-      Circle(
-        circleId: const CircleId("destination"),
-        center: LatLng(widget.place_lat, widget.place_lng),
-        radius: 500,
-        strokeWidth: 0,
-        fillColor: Colors.grey.withOpacity(0.3),
-      )
-    };
-
-    getCurrentLocation();
-
     readFavPlaces();
+
+    future = prepareForMap();
+
+    // getCurrentLocation();
+
+    // _readRouteStop();
+    // _findNearbyStop(_stopList0);
     // checkFav();
+
+    // Future.delayed(const Duration(milliseconds: 250), () {
+    //   setState(() {
+    //     showMap = true;
+    //   });
+    // });
   }
 
   Future readFavPlaces() async {
-    _placeList = await PlacesDatabase.instance.readAllPlaces(favTable);
+    _favList = await PlacesDatabase.instance.readAllPlaces(favTable);
     setState(() {});
-    developer.log(_placeList.toString(), name: 'placeFav');
-    checkFav();
+    developer.log(_favList.toString(), name: 'placeFav');
+    // checkFav();
   }
 
   Future insertPlace(Place place) async {
@@ -104,36 +104,200 @@ class _ConfirmingState extends State<Confirming> {
 
   checkFav() {
     try {
-      _placeList.firstWhere((place) => place.name == widget.place_name);
-      setState(() {
-        _faved = true;
-      });
+      _favList.firstWhere((place) => place.name == _centerName);
+      // setState(() {
+      _faved = true;
+      // });
     } catch (error) {
-      setState(() {
-        _faved = false;
-      });
+      // setState(() {
+      _faved = false;
+      // });
     }
   }
 
-  _addMarker(LatLng position, String id, BitmapDescriptor descriptor) {
-    MarkerId markerId = MarkerId(id);
-    Offset offset =
-        id == "user" ? const Offset(0.5, 0.5) : const Offset(0.5, 1.0);
-    Marker marker = Marker(
-        markerId: markerId,
-        icon: descriptor,
-        position: position,
-        anchor: offset);
-    markers[markerId] = marker;
+  Future<LatLng> prepareForMap() async {
+    developer.log("in future...");
+    await getCurrentLocation();
+    developer.log('location_finished');
+
+    await Future.delayed(const Duration(milliseconds: 4000));
+    await _readRouteStop();
+    developer.log('stops_finished');
+    await _readEstimatedTime();
+    developer.log('time_finished');
+
+    return _findNearbyStop(_stopList0);
   }
 
-  void addCustomIcon() {
-    BitmapDescriptor.fromAssetImage(
-            const ImageConfiguration(), "assets/bus.png")
-        .then(
+  Future _readRouteStop() async {
+    var uri = Uri.parse(
+        'https://tdx.transportdata.tw/api/basic/v2/Bus/StopOfRoute/City/Taipei/${widget.bus_route}?%24filter=RouteName%2FZh_tw%20eq%20%27${widget.bus_route}%27&24format=JSON');
+    var response = await http.get(uri, headers: {'authorization': "Bearer ${widget.bus_token}"});
+    if (response.statusCode == 200) {
+      // developer.log(json.decode(response.body).toString());
+
+      //setState(() {
+      _stopList0 = json.decode(response.body)[0]["Stops"];
+      //});
+
+      if (json.decode(response.body)[1].toString().isNotEmpty) {
+        //setState(() {
+        _stopList1 = json.decode(response.body)[1]["Stops"];
+        //});
+        // developer.log(_stopList1.first['StopName']['Zh_tw'], name: 'firststop1');
+      }
+    } else {
+      developer.log(json.decode(response.body).toString());
+    }
+
+    // await _findNearbyStop(_stopList0);
+  }
+
+  Future _readEstimatedTime() async {
+    var uri = Uri.parse(
+        'https://tdx.transportdata.tw/api/basic/v2/Bus/EstimatedTimeOfArrival/City/Taipei/${widget.bus_route}?%24filter=Direction%20eq%200&%24orderby=StopID%20asc&%24format=JSON');
+    var response = await http.get(uri, headers: {'authorization': "Bearer ${widget.bus_token}"});
+    if (response.statusCode == 200) {
+      // developer.log(json.decode(response.body).toString());
+      _stopList0Time = json.decode(response.body);
+    } else {
+      developer.log(json.decode(response.body).toString());
+    }
+
+    uri = Uri.parse(
+        'https://tdx.transportdata.tw/api/basic/v2/Bus/EstimatedTimeOfArrival/City/Taipei/${widget.bus_route}?%24filter=Direction%20eq%201&%24orderby=StopID%20asc&%24format=JSON');
+    response = await http.get(uri, headers: {'authorization': "Bearer ${widget.bus_token}"});
+    if (response.statusCode == 200) {
+      // developer.log(json.decode(response.body).toString());
+      _stopList1Time = json.decode(response.body);
+    } else {
+      developer.log(json.decode(response.body).toString());
+    }
+  }
+
+  Future<LatLng> _findNearbyStop(List stops) async {
+    //add all stop markers
+    //add destination circle
+    //check Fav
+
+    _centerName = stops.first['StopName']['Zh_tw'];
+    _centerLatLong = LatLng(stops.first['StopPosition']['PositionLat'], stops.first['StopPosition']['PositionLon']);
+    //setState(() {});
+
+    developer.log(_centerName, name: 'firststop0');
+
+    var minDistance = Geolocator.distanceBetween(
+        _currentLocation!.latitude!, _currentLocation!.longitude!, _centerLatLong.latitude, _centerLatLong.longitude);
+    developer.log(minDistance.toString(), name: 'min distance');
+
+    for (var stop in stops) {
+      _addMarker(LatLng(stop['StopPosition']['PositionLat'], stop['StopPosition']['PositionLon']),
+          stop['StopName']['Zh_tw'], BitmapDescriptor.defaultMarker);
+
+      var distance = Geolocator.distanceBetween(_currentLocation!.latitude!, _currentLocation!.longitude!,
+          stop['StopPosition']['PositionLat'], stop['StopPosition']['PositionLon']);
+
+      // developer.log(stop['StopName']['Zh_tw'], name: 'distance');
+      // developer.log(distance.toString(), name: 'distance');
+
+      if (distance < minDistance) {
+        _centerLatLong = LatLng(stop['StopPosition']['PositionLat'], stop['StopPosition']['PositionLon']);
+        _centerName = stop['StopName']['Zh_tw'];
+        minDistance = distance;
+      }
+    }
+
+    circles = {
+      Circle(
+        circleId: const CircleId("destination"),
+        center: _centerLatLong,
+        radius: 500,
+        strokeWidth: 0,
+        fillColor: Colors.grey.withOpacity(0.3),
+      )
+    };
+
+    // _readPlaceID(_centerLatLong);
+    checkFav();
+
+    //setState(() {});
+    // developer.log(_centerName, name: 'center');
+    return _centerLatLong;
+  }
+
+  _readPlaceID(LatLng point) async {
+    var response = await http.get(Uri.parse('https://maps.googleapis.com/maps/api/geocode/json'
+        '?latlng=${point.latitude},${point.longitude}'
+        '&key=$googleAPiKey'));
+    if (response.statusCode == 200) {
+      // developer.log(json.decode(response.body).toString(), name: 'readPlaceID');
+      // setState(() {
+      _centerID = json.decode(response.body)['results'][0]['place_id'];
+
+      // });
+    } else {
+      developer.log(json.decode(response.body).toString());
+    }
+  }
+
+  _addMarker(LatLng position, String id, BitmapDescriptor descriptor) async {
+    MarkerId markerId = MarkerId(id);
+    Offset offset = id == "user" ? const Offset(0.5, 0.5) : const Offset(0.5, 1.0);
+
+    InfoWindow infoWindow;
+    try {
+      infoWindow = InfoWindow(
+          title: id,
+          snippet:
+              "到站時間： ${_stopList0Time.firstWhere((element) => element['StopName']['Zh_tw'] == id)['EstimateTime'] ~/ 60}分鐘");
+    } catch (e) {
+      developer.log(e.toString());
+      infoWindow = InfoWindow(title: id, snippet: "到站時間： 未發車");
+    }
+
+    Marker marker = id == "user"
+        ? Marker(markerId: markerId, icon: descriptor, position: position, anchor: offset, zIndex: 99)
+        : Marker(
+            markerId: markerId,
+            icon: descriptor,
+            position: position,
+            anchor: offset,
+            infoWindow: infoWindow,
+            onTap: () {
+              _readEstimatedTime();
+
+              circles.clear();
+              circles = {
+                Circle(
+                  circleId: const CircleId("destination"),
+                  center: position,
+                  radius: 500,
+                  strokeWidth: 0,
+                  fillColor: Colors.grey.withOpacity(0.3),
+                )
+              };
+              _centerLatLong = position;
+              _centerName = id;
+              checkFav();
+              setState(() {});
+            },
+          );
+    markers[markerId] = marker;
+    // setState(() {});
+  }
+
+  addCustomIcon() {
+    BitmapDescriptor.fromAssetImage(const ImageConfiguration(), "assets/bus.png").then(
       (icon) {
         setState(() {
-          markerIcon = icon;
+          trackingMarker = icon;
+        });
+      },
+    );
+    BitmapDescriptor.fromAssetImage(const ImageConfiguration(), "assets/blueDot.png").then(
+      (icon) {
+        setState(() {
+          confirmingMarker = icon;
         });
       },
     );
@@ -141,11 +305,7 @@ class _ConfirmingState extends State<Confirming> {
 
   _addPolyLine() {
     PolylineId id = const PolylineId("poly");
-    Polyline polyline = Polyline(
-        polylineId: id,
-        color: Colors.grey.shade600,
-        points: polylineCoordinates,
-        width: 5);
+    Polyline polyline = Polyline(polylineId: id, color: Colors.grey.shade600, points: polylineCoordinates, width: 5);
     polylines[id] = polyline;
     setState(() {});
   }
@@ -154,7 +314,7 @@ class _ConfirmingState extends State<Confirming> {
     PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
         googleAPiKey,
         PointLatLng(_currentLocation!.latitude!, _currentLocation!.longitude!),
-        PointLatLng(widget.place_lat, widget.place_lng),
+        PointLatLng(_centerLatLong.latitude, _centerLatLong.longitude),
         travelMode: TravelMode.driving);
     polylineCoordinates.clear();
     if (result.points.isNotEmpty) {
@@ -170,14 +330,19 @@ class _ConfirmingState extends State<Confirming> {
     rootBundle.loadString('assets/no_markers.json').then((String mapStyle) {
       controller.setMapStyle(mapStyle);
     });
+    mapController.showMarkerInfoWindow(MarkerId(_centerName));
   }
 
   //get current location
 
-  void getCurrentLocation() async {
+  getCurrentLocation() async {
     location.getLocation().then(
       (location) {
         _currentLocation = location;
+        developer.log("got location!", name: 'location');
+
+        markers.remove(const MarkerId("user"));
+        _addMarker(LatLng(location.latitude!, location.longitude!), "user", confirmingMarker);
       },
     );
 
@@ -187,16 +352,13 @@ class _ConfirmingState extends State<Confirming> {
         if (_tracking) {
           developer.log("location updated!", name: 'location');
           _currentLocation = newLoc;
-          if (Geolocator.distanceBetween(
-                  _currentLocation!.latitude!,
-                  _currentLocation!.longitude!,
-                  widget.place_lat,
-                  widget.place_lng) <
+          if (Geolocator.distanceBetween(_currentLocation!.latitude!, _currentLocation!.longitude!,
+                  _centerLatLong.latitude, _centerLatLong.longitude) <
               500) {
             Navigator.of(context).push(FadePageRoute(const Arrived()));
           }
           updatedGPS(newLoc);
-          setState(() {});
+          //setState(() {});
         }
       },
     );
@@ -208,18 +370,15 @@ class _ConfirmingState extends State<Confirming> {
 
     //custoer: bus
     markers.remove(const MarkerId("user"));
-    _addMarker(
-        LatLng(location.latitude!, location.longitude!), "user", markerIcon);
+    _addMarker(LatLng(location.latitude!, location.longitude!), "user", trackingMarker);
 
     //calculate the compass
-    double calculatedRotation = Geolocator.bearingBetween(location.latitude!,
-        location.longitude!, widget.place_lat, widget.place_lng);
+    double calculatedRotation = Geolocator.bearingBetween(
+        location.latitude!, location.longitude!, _centerLatLong.latitude, _centerLatLong.longitude);
 
     //let the map move down a bit
-    double calculatedLat =
-        (widget.place_lat - location.latitude!) * 0.2 + location.latitude!;
-    double calculatedLng =
-        (widget.place_lng - location.longitude!) * 0.2 + location.longitude!;
+    double calculatedLat = (_centerLatLong.latitude - location.latitude!) * 0.2 + location.latitude!;
+    double calculatedLng = (_centerLatLong.longitude - location.longitude!) * 0.2 + location.longitude!;
 
     //new CameraPosition
     mapController.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
@@ -229,22 +388,23 @@ class _ConfirmingState extends State<Confirming> {
       bearing: calculatedRotation,
     )));
 
-    setState(() {});
+    // setState(() {});
   }
 
-  favOnTap() {
+  favOnTap() async {
+    await _readPlaceID(_centerLatLong);
     if (_faved) {
-      deletePlace(widget.place_id);
+      deletePlace(_centerID);
       warning("已移除收藏！");
       setState(() {
         _faved = false;
       });
     } else {
       insertPlace(Place(
-        id: widget.place_id,
-        name: widget.place_name,
-        lat: widget.place_lat,
-        lng: widget.place_lng,
+        id: _centerID,
+        name: _centerName,
+        lat: _centerLatLong.latitude,
+        lng: _centerLatLong.longitude,
       ));
       warning("已收藏地點！");
       setState(() {
@@ -254,6 +414,7 @@ class _ConfirmingState extends State<Confirming> {
   }
 
   startTracking() {
+    // Navigator.of(context).push(FadePageRoute(const Arrived()));
     updatedGPS(_currentLocation!);
     _getPolyline();
     setState(() {
@@ -264,11 +425,13 @@ class _ConfirmingState extends State<Confirming> {
   cancelTracking() {
     polylines.remove(const PolylineId("poly"));
     markers.remove(const MarkerId("user"));
+    _addMarker(LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!), "user", confirmingMarker);
+
     setState(() {
       _tracking = false;
     });
     mapController.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
-      target: _center,
+      target: _centerLatLong,
       zoom: 16.0,
       bearing: 0,
       tilt: 0,
@@ -282,27 +445,53 @@ class _ConfirmingState extends State<Confirming> {
         children: [
           //Google Map
           Positioned.fill(
-            child: GoogleMap(
-              onMapCreated: _onMapCreated,
-              compassEnabled: false,
-              zoomControlsEnabled: false,
-              // zoomGesturesEnabled: false,
-              // scrollGesturesEnabled: false,
-              rotateGesturesEnabled: false,
-              markers: Set<Marker>.of(markers.values),
-              polylines: Set<Polyline>.of(polylines.values),
-              circles: circles,
-              // padding: const EdgeInsets.fromLTRB(0, 320, 0, 0),
-              initialCameraPosition: CameraPosition(
-                target: _center,
-                zoom: 16.0,
-                bearing: 0,
-                // tilt: 90
-              ),
-            ),
+            child: FutureBuilder<LatLng>(
+                future: future,
+                builder: (BuildContext context, AsyncSnapshot snapshot) {
+                  if (snapshot.connectionState == ConnectionState.done) {
+                    developer.log(snapshot.toString(), name: 'snapshot');
+
+                    if (snapshot.hasError) {
+                      // 请求失败，显示错误
+                      return Text("Error: ${snapshot.error}");
+                    } else {
+                      // 请求成功，显示数据
+                      return GoogleMap(
+                        onMapCreated: _onMapCreated,
+                        compassEnabled: false,
+                        zoomControlsEnabled: false,
+                        // zoomGesturesEnabled: false,
+                        // scrollGesturesEnabled: false,
+                        rotateGesturesEnabled: false,
+                        markers: Set<Marker>.of(markers.values),
+                        polylines: Set<Polyline>.of(polylines.values),
+                        circles: circles,
+                        // padding: const EdgeInsets.fromLTRB(0, 320, 0, 0),
+                        initialCameraPosition: CameraPosition(
+                          target: snapshot.data,
+                          zoom: 16.0,
+                          bearing: 0,
+                          // tilt: 90
+                        ),
+                      );
+                      // return Text("Contents: ${snapshot.data}");
+                    }
+                  } else {
+                    // 请求未结束，显示loading
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                      ),
+                      child: const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+                }),
           ),
 
           //Loading Widget
+          /*
           Positioned.fill(
             child: Visibility(
               visible: loading,
@@ -325,6 +514,7 @@ class _ConfirmingState extends State<Confirming> {
               ),
             ),
           ),
+          */
 
           //Bottom Widgets
           Positioned(
@@ -356,45 +546,33 @@ class _ConfirmingState extends State<Confirming> {
                                 width: MediaQuery.of(context).size.width - 30,
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(32),
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .surfaceVariant,
+                                  color: Theme.of(context).colorScheme.surfaceVariant,
                                 ),
                                 child: Padding(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(20, 0, 0, 0),
+                                  padding: const EdgeInsets.fromLTRB(20, 0, 0, 0),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.start,
                                     children: <Widget>[
                                       Expanded(
                                         child: Text(
-                                          widget.place_name,
+                                          widget.bus_route,
                                           style: TextStyle(
                                             fontSize: 20,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSecondaryContainer,
+                                            color: Theme.of(context).colorScheme.onSecondaryContainer,
                                           ),
                                         ),
                                       ),
                                       Material(
                                         type: MaterialType.transparency,
                                         child: InkWell(
-                                          customBorder: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(30)),
+                                          customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                                           child: Padding(
                                             padding: const EdgeInsets.all(20.0),
                                             child: Icon(
-                                              _faved
-                                                  ? Icons.favorite_outlined
-                                                  : Icons
-                                                      .favorite_border_outlined,
+                                              _faved ? Icons.favorite_outlined : Icons.favorite_border_outlined,
                                               color: _faved
                                                   ? Colors.red[700]
-                                                  : Theme.of(context)
-                                                      .colorScheme
-                                                      .onSecondaryContainer,
+                                                  : Theme.of(context).colorScheme.onSecondaryContainer,
                                               size: 24.0,
                                             ),
                                           ),
@@ -413,9 +591,7 @@ class _ConfirmingState extends State<Confirming> {
                     height: 10,
                   ),
                   AnimatedCrossFade(
-                    crossFadeState: !_tracking
-                        ? CrossFadeState.showFirst
-                        : CrossFadeState.showSecond,
+                    crossFadeState: !_tracking ? CrossFadeState.showFirst : CrossFadeState.showSecond,
                     duration: const Duration(milliseconds: 400),
                     firstCurve: Curves.fastOutSlowIn,
                     secondCurve: Curves.fastOutSlowIn,
@@ -435,23 +611,18 @@ class _ConfirmingState extends State<Confirming> {
                                   height: 60,
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(30),
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .primaryContainer,
+                                    color: Theme.of(context).colorScheme.primaryContainer,
                                   ),
                                   child: Center(
                                     child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
+                                      mainAxisAlignment: MainAxisAlignment.center,
                                       children: <Widget>[
                                         // Hero(
                                         //   tag: 'sIcon',
                                         //   child:
                                         Icon(
                                           Icons.check,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onPrimaryContainer,
+                                          color: Theme.of(context).colorScheme.onPrimaryContainer,
                                           size: 24.0,
                                         ),
                                         //),
@@ -460,9 +631,7 @@ class _ConfirmingState extends State<Confirming> {
                                           '確認',
                                           style: TextStyle(
                                             fontSize: 18,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onPrimaryContainer,
+                                            color: Theme.of(context).colorScheme.onPrimaryContainer,
                                           ),
                                         ),
                                       ],
@@ -514,16 +683,12 @@ class _ConfirmingState extends State<Confirming> {
                                 width: 60,
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(30),
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .surfaceVariant,
+                                  color: Theme.of(context).colorScheme.surfaceVariant,
                                 ),
                                 child: Center(
                                   child: Icon(
                                     Icons.cancel_outlined,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSecondaryContainer,
+                                    color: Theme.of(context).colorScheme.onSecondaryContainer,
                                     size: 24.0,
                                   ),
                                 ),
@@ -565,9 +730,7 @@ class _ConfirmingState extends State<Confirming> {
                             height: 60,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(30),
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primaryContainer,
+                              color: Theme.of(context).colorScheme.primaryContainer,
                             ),
                             child: Center(
                               child: Row(
@@ -578,9 +741,7 @@ class _ConfirmingState extends State<Confirming> {
                                   //   child:
                                   Icon(
                                     Icons.cancel_outlined,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onPrimaryContainer,
+                                    color: Theme.of(context).colorScheme.onPrimaryContainer,
                                     size: 24.0,
                                   ),
                                   //),
@@ -589,9 +750,7 @@ class _ConfirmingState extends State<Confirming> {
                                     '取消',
                                     style: TextStyle(
                                       fontSize: 18,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onPrimaryContainer,
+                                      color: Theme.of(context).colorScheme.onPrimaryContainer,
                                     ),
                                   ),
                                 ],
