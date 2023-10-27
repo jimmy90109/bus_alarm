@@ -4,6 +4,7 @@ import 'package:custom_sliding_segmented_control/custom_sliding_segmented_contro
 import 'package:flutter/material.dart';
 import 'package:google_map/BusConfirm.dart';
 import 'package:google_map/Confirming.dart';
+import 'package:location/location.dart';
 import 'package:uuid/uuid.dart';
 import 'package:http/http.dart' as http;
 import 'dart:developer' as developer;
@@ -11,7 +12,11 @@ import 'dart:developer' as developer;
 import 'animation/RouteAnimation.dart';
 
 class SearchingPlace extends StatefulWidget {
-  const SearchingPlace({super.key});
+  final LocationData currentLocation;
+  const SearchingPlace({
+    super.key,
+    required this.currentLocation,
+  });
 
   @override
   State<SearchingPlace> createState() => _SearchingPlaceState();
@@ -19,7 +24,7 @@ class SearchingPlace extends StatefulWidget {
 
 class _SearchingPlaceState extends State<SearchingPlace> {
   late FocusNode focusNode = FocusNode();
-  // TextEditingController tc = TextEditingController();
+  TextEditingController txcontroller = TextEditingController();
 
   //for place autoComplete
   final String _gAPI = "AIzaSyBu6yKj0QDgRglC0Ns-yx_FIUgGBOueh4Q";
@@ -165,6 +170,7 @@ class _SearchingPlaceState extends State<SearchingPlace> {
                         borderRadius: BorderRadius.circular(25),
                       ),
                       onValueChanged: (v) {
+                        txcontroller.clear();
                         if (v == 2) {
                           if (busToken.isEmpty) {
                             getBusToken();
@@ -281,6 +287,7 @@ class _SearchingPlaceState extends State<SearchingPlace> {
                                                 Navigator.of(context).push(FadePageRoute(BusConfirm(
                                                   bus_route: _placeList[index]["RouteName"]["Zh_tw"],
                                                   bus_token: busToken,
+                                                  lastLocation: widget.currentLocation,
                                                 )));
                                                 // } else {
                                                 //   throw Exception('Failed to load predictions');
@@ -314,6 +321,7 @@ class _SearchingPlaceState extends State<SearchingPlace> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: TextField(
+                              controller: txcontroller,
                               cursorHeight: 20,
                               focusNode: focusNode,
                               // controller: tc,

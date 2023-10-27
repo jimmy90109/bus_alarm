@@ -9,6 +9,7 @@ import 'package:google_map/database/place_database.dart';
 import 'package:google_map/util/toast.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:label_marker/label_marker.dart';
 import 'package:location/location.dart';
 // import 'util/map_util.dart';
 import 'model/place.dart';
@@ -19,11 +20,13 @@ import 'package:geolocator/geolocator.dart';
 class BusConfirm extends StatefulWidget {
   final String bus_route;
   final String bus_token;
+  final LocationData lastLocation;
 
   const BusConfirm({
     super.key,
     required this.bus_route,
     required this.bus_token,
+    required this.lastLocation,
   });
 
   @override
@@ -40,7 +43,8 @@ class _BusConfirmState extends State<BusConfirm> {
   Set<Circle> circles = {};
   BitmapDescriptor trackingMarker = BitmapDescriptor.defaultMarker;
   BitmapDescriptor confirmingMarker = BitmapDescriptor.defaultMarker;
-  Map<MarkerId, Marker> markers = {};
+  BitmapDescriptor littleBus = BitmapDescriptor.defaultMarker;
+  Set<Marker> markers = {};
   List<LatLng> polylineCoordinates = [];
   PolylinePoints polylinePoints = PolylinePoints();
   Map<PolylineId, Polyline> polylines = {};
@@ -50,9 +54,16 @@ class _BusConfirmState extends State<BusConfirm> {
   late List<Place> _favList;
   bool _faved = false;
 
+  //bus direction
+  int _direction = 0;
+
   //bus stop list
   List<dynamic> _stopList0 = [], _stopList1 = [];
   List<dynamic> _stopList0Time = [], _stopList1Time = [];
+
+  //bus location
+  List<dynamic> _busLocation0 = [];
+  List<dynamic> _busLocation1 = [];
 
   late LatLng _centerLatLong;
   late String _centerName, _centerID;
@@ -67,29 +78,32 @@ class _BusConfirmState extends State<BusConfirm> {
   void initState() {
     super.initState();
 
+    _currentLocation = widget.lastLocation;
+
     addCustomIcon();
     readFavPlaces();
 
+    _readBusLocation();
+
     future = prepareForMap();
+  }
 
-    // getCurrentLocation();
+  Future<LatLng> prepareForMap() async {
+    developer.log("in future...");
+    await getCurrentLocation();
+    developer.log('location_finished');
+    await _readRouteStop();
+    developer.log('stops_finished');
+    await _readEstimatedTime();
+    developer.log('time_finished');
 
-    // _readRouteStop();
-    // _findNearbyStop(_stopList0);
-    // checkFav();
-
-    // Future.delayed(const Duration(milliseconds: 250), () {
-    //   setState(() {
-    //     showMap = true;
-    //   });
-    // });
+    return _findNearbyStop(_stopList0);
   }
 
   Future readFavPlaces() async {
     _favList = await PlacesDatabase.instance.readAllPlaces(favTable);
     setState(() {});
     developer.log(_favList.toString(), name: 'placeFav');
-    // checkFav();
   }
 
   Future insertPlace(Place place) async {
@@ -105,28 +119,10 @@ class _BusConfirmState extends State<BusConfirm> {
   checkFav() {
     try {
       _favList.firstWhere((place) => place.name == _centerName);
-      // setState(() {
       _faved = true;
-      // });
     } catch (error) {
-      // setState(() {
       _faved = false;
-      // });
     }
-  }
-
-  Future<LatLng> prepareForMap() async {
-    developer.log("in future...");
-    await getCurrentLocation();
-    developer.log('location_finished');
-
-    await Future.delayed(const Duration(milliseconds: 4000));
-    await _readRouteStop();
-    developer.log('stops_finished');
-    await _readEstimatedTime();
-    developer.log('time_finished');
-
-    return _findNearbyStop(_stopList0);
   }
 
   Future _readRouteStop() async {
@@ -134,23 +130,37 @@ class _BusConfirmState extends State<BusConfirm> {
         'https://tdx.transportdata.tw/api/basic/v2/Bus/StopOfRoute/City/Taipei/${widget.bus_route}?%24filter=RouteName%2FZh_tw%20eq%20%27${widget.bus_route}%27&24format=JSON');
     var response = await http.get(uri, headers: {'authorization': "Bearer ${widget.bus_token}"});
     if (response.statusCode == 200) {
-      // developer.log(json.decode(response.body).toString());
-
-      //setState(() {
       _stopList0 = json.decode(response.body)[0]["Stops"];
-      //});
-
       if (json.decode(response.body)[1].toString().isNotEmpty) {
-        //setState(() {
         _stopList1 = json.decode(response.body)[1]["Stops"];
-        //});
-        // developer.log(_stopList1.first['StopName']['Zh_tw'], name: 'firststop1');
       }
     } else {
       developer.log(json.decode(response.body).toString());
     }
+  }
 
-    // await _findNearbyStop(_stopList0);
+  Future _readBusLocation() async {
+    var uri = Uri.parse(
+        'https://tdx.transportdata.tw/api/basic/v2/Bus/RealTimeByFrequency/City/Taipei/${widget.bus_route}?%24filter=RouteName%2FZh_tw%20eq%20%27${widget.bus_route}%27%20AND%20Direction%20eq%200&%24format=JSON');
+    var response = await http.get(uri, headers: {'authorization': "Bearer ${widget.bus_token}"});
+    if (response.statusCode == 200) {
+      //developer.log(json.decode(response.body).toString());
+      _busLocation0 = json.decode(response.body);
+    } else {
+      developer.log(json.decode(response.body).toString());
+    }
+
+    uri = Uri.parse(
+        'https://tdx.transportdata.tw/api/basic/v2/Bus/RealTimeByFrequency/City/Taipei/${widget.bus_route}?%24filter=RouteName%2FZh_tw%20eq%20%27${widget.bus_route}%27%20AND%20Direction%20eq%201&%24format=JSON');
+    response = await http.get(uri, headers: {'authorization': "Bearer ${widget.bus_token}"});
+    if (response.statusCode == 200) {
+      // developer.log(json.decode(response.body).toString());
+      _busLocation1 = json.decode(response.body);
+    } else {
+      developer.log(json.decode(response.body).toString());
+    }
+
+    _addBusMarker(_busLocation0);
   }
 
   Future _readEstimatedTime() async {
@@ -182,29 +192,26 @@ class _BusConfirmState extends State<BusConfirm> {
 
     _centerName = stops.first['StopName']['Zh_tw'];
     _centerLatLong = LatLng(stops.first['StopPosition']['PositionLat'], stops.first['StopPosition']['PositionLon']);
-    //setState(() {});
-
-    developer.log(_centerName, name: 'firststop0');
 
     var minDistance = Geolocator.distanceBetween(
         _currentLocation!.latitude!, _currentLocation!.longitude!, _centerLatLong.latitude, _centerLatLong.longitude);
     developer.log(minDistance.toString(), name: 'min distance');
 
+    var index = 1;
     for (var stop in stops) {
-      _addMarker(LatLng(stop['StopPosition']['PositionLat'], stop['StopPosition']['PositionLon']),
-          stop['StopName']['Zh_tw'], BitmapDescriptor.defaultMarker);
+      _addStopMarker(LatLng(stop['StopPosition']['PositionLat'], stop['StopPosition']['PositionLon']),
+          stop['StopName']['Zh_tw'], index);
 
       var distance = Geolocator.distanceBetween(_currentLocation!.latitude!, _currentLocation!.longitude!,
           stop['StopPosition']['PositionLat'], stop['StopPosition']['PositionLon']);
-
-      // developer.log(stop['StopName']['Zh_tw'], name: 'distance');
-      // developer.log(distance.toString(), name: 'distance');
 
       if (distance < minDistance) {
         _centerLatLong = LatLng(stop['StopPosition']['PositionLat'], stop['StopPosition']['PositionLon']);
         _centerName = stop['StopName']['Zh_tw'];
         minDistance = distance;
       }
+
+      index++;
     }
 
     circles = {
@@ -240,50 +247,62 @@ class _BusConfirmState extends State<BusConfirm> {
     }
   }
 
-  _addMarker(LatLng position, String id, BitmapDescriptor descriptor) async {
-    MarkerId markerId = MarkerId(id);
-    Offset offset = id == "user" ? const Offset(0.5, 0.5) : const Offset(0.5, 1.0);
-
-    InfoWindow infoWindow;
+  _addStopMarker(LatLng position, String id, int index) {
+    String estmateTime;
     try {
-      infoWindow = InfoWindow(
-          title: id,
-          snippet:
-              "到站時間： ${_stopList0Time.firstWhere((element) => element['StopName']['Zh_tw'] == id)['EstimateTime'] ~/ 60}分鐘");
+      int time;
+      _direction == 0
+          ? time = _stopList0Time.firstWhere((element) => element['StopName']['Zh_tw'] == id)['EstimateTime'] ~/ 60
+          : time = _stopList1Time.firstWhere((element) => element['StopName']['Zh_tw'] == id)['EstimateTime'] ~/ 60;
+      time == 0 ? estmateTime = "進站中" : estmateTime = "$time分鐘";
     } catch (e) {
       developer.log(e.toString());
-      infoWindow = InfoWindow(title: id, snippet: "到站時間： 未發車");
+      estmateTime = "未發車";
     }
 
-    Marker marker = id == "user"
-        ? Marker(markerId: markerId, icon: descriptor, position: position, anchor: offset, zIndex: 99)
-        : Marker(
-            markerId: markerId,
-            icon: descriptor,
-            position: position,
-            anchor: offset,
-            infoWindow: infoWindow,
-            onTap: () {
-              _readEstimatedTime();
+    markers
+        .addLabelMarker(LabelMarker(
+      label: "$index.$id:$estmateTime",
+      markerId: MarkerId(id),
+      position: position,
+      zIndex: 0,
+      backgroundColor: Theme.of(context).colorScheme.secondary,
+      textStyle: const TextStyle(fontSize: 27.0, color: Colors.white, letterSpacing: 1.0, fontFamily: 'Roboto Bold'),
+      onTap: () {
+        circles.clear();
+        circles = {
+          Circle(
+            circleId: const CircleId("destination"),
+            center: position,
+            radius: 500,
+            strokeWidth: 0,
+            fillColor: Colors.grey.withOpacity(0.3),
+          )
+        };
+        _centerLatLong = position;
+        _centerName = id;
+        checkFav();
+        setState(() {});
+      },
+    ))
+        .then(
+      (value) {
+        setState(() {});
+      },
+    );
+  }
 
-              circles.clear();
-              circles = {
-                Circle(
-                  circleId: const CircleId("destination"),
-                  center: position,
-                  radius: 500,
-                  strokeWidth: 0,
-                  fillColor: Colors.grey.withOpacity(0.3),
-                )
-              };
-              _centerLatLong = position;
-              _centerName = id;
-              checkFav();
-              setState(() {});
-            },
-          );
-    markers[markerId] = marker;
-    // setState(() {});
+  _addBusMarker(List busLocation) {
+    int index = 1;
+    for (var bus in busLocation) {
+      markers.add(Marker(
+          markerId: MarkerId("bus$index"),
+          icon: littleBus,
+          position: LatLng(bus['BusPosition']['PositionLat'], bus['BusPosition']['PositionLon']),
+          anchor: const Offset(0.5, 0.5),
+          zIndex: 1));
+      index++;
+    }
   }
 
   addCustomIcon() {
@@ -298,6 +317,13 @@ class _BusConfirmState extends State<BusConfirm> {
       (icon) {
         setState(() {
           confirmingMarker = icon;
+        });
+      },
+    );
+    BitmapDescriptor.fromAssetImage(const ImageConfiguration(), "assets/littleBus.png").then(
+      (icon) {
+        setState(() {
+          littleBus = icon;
         });
       },
     );
@@ -330,7 +356,7 @@ class _BusConfirmState extends State<BusConfirm> {
     rootBundle.loadString('assets/no_markers.json').then((String mapStyle) {
       controller.setMapStyle(mapStyle);
     });
-    mapController.showMarkerInfoWindow(MarkerId(_centerName));
+    // mapController.showMarkerInfoWindow(MarkerId(_centerName));
   }
 
   //get current location
@@ -342,11 +368,16 @@ class _BusConfirmState extends State<BusConfirm> {
         developer.log("got location!", name: 'location');
 
         markers.remove(const MarkerId("user"));
-        _addMarker(LatLng(location.latitude!, location.longitude!), "user", confirmingMarker);
+        markers.add(Marker(
+            markerId: const MarkerId("user"),
+            icon: confirmingMarker,
+            position: LatLng(location.latitude!, location.longitude!),
+            anchor: const Offset(0.5, 0.5),
+            zIndex: 99));
       },
     );
 
-    await location.changeSettings(interval: 1000, distanceFilter: 50);
+    await location.changeSettings(interval: 60000, distanceFilter: 50);
     location.onLocationChanged.listen(
       (newLoc) {
         if (_tracking) {
@@ -355,10 +386,11 @@ class _BusConfirmState extends State<BusConfirm> {
           if (Geolocator.distanceBetween(_currentLocation!.latitude!, _currentLocation!.longitude!,
                   _centerLatLong.latitude, _centerLatLong.longitude) <
               500) {
-            Navigator.of(context).push(FadePageRoute(const Arrived()));
+            Navigator.of(context).push(FadePageRoute(Arrived(
+              placeName: _centerName,
+            )));
           }
           updatedGPS(newLoc);
-          //setState(() {});
         }
       },
     );
@@ -369,8 +401,14 @@ class _BusConfirmState extends State<BusConfirm> {
     _getPolyline();
 
     //custoer: bus
-    markers.remove(const MarkerId("user"));
-    _addMarker(LatLng(location.latitude!, location.longitude!), "user", trackingMarker);
+    markers.removeWhere((stop) => stop.markerId == const MarkerId("user"));
+    markers.add(Marker(
+        markerId: const MarkerId("user"),
+        icon: trackingMarker,
+        position: LatLng(location.latitude!, location.longitude!),
+        anchor: const Offset(0.5, 0.5),
+        zIndex: 99));
+    // _addUserMarker(LatLng(location.latitude!, location.longitude!), "user", trackingMarker);
 
     //calculate the compass
     double calculatedRotation = Geolocator.bearingBetween(
@@ -413,7 +451,60 @@ class _BusConfirmState extends State<BusConfirm> {
     }
   }
 
+  reverseOnTap() {
+    markers.removeWhere((stop) => stop.markerId != const MarkerId("user"));
+    // developer.log(markers.toString());
+    // setState(() {});
+
+    if (_direction == 0) {
+      _direction = 1;
+      _addBusMarker(_busLocation1);
+      _findNearbyStop(_stopList1);
+    } else {
+      _direction = 0;
+      _addBusMarker(_busLocation0);
+      _findNearbyStop(_stopList0);
+    }
+    // setState(() {});
+
+    mapController.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
+      target: _centerLatLong,
+      zoom: 16.0,
+      bearing: 0,
+      tilt: 0,
+    )));
+  }
+
+  refreshOmTap() async {
+    await _readEstimatedTime();
+    await _readBusLocation();
+
+    markers.removeWhere((stop) => stop.markerId != const MarkerId("user"));
+    if (_direction == 1) {
+      _addBusMarker(_busLocation1);
+      _findNearbyStop(_stopList1);
+    } else {
+      _addBusMarker(_busLocation0);
+      _findNearbyStop(_stopList0);
+    }
+  }
+
   startTracking() {
+    markers.removeWhere((marker) => marker.markerId != const MarkerId("user"));
+    markers
+        .addLabelMarker(LabelMarker(
+      label: _centerName,
+      markerId: MarkerId(_centerName),
+      position: _centerLatLong,
+      zIndex: 0,
+      backgroundColor: Theme.of(context).colorScheme.secondary,
+      textStyle: const TextStyle(fontSize: 27.0, color: Colors.white, letterSpacing: 1.0, fontFamily: 'Roboto Bold'),
+    ))
+        .then(
+      (value) {
+        setState(() {});
+      },
+    );
     // Navigator.of(context).push(FadePageRoute(const Arrived()));
     updatedGPS(_currentLocation!);
     _getPolyline();
@@ -424,8 +515,31 @@ class _BusConfirmState extends State<BusConfirm> {
 
   cancelTracking() {
     polylines.remove(const PolylineId("poly"));
-    markers.remove(const MarkerId("user"));
-    _addMarker(LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!), "user", confirmingMarker);
+    markers.clear();
+    markers.add(Marker(
+        markerId: const MarkerId("user"),
+        icon: confirmingMarker,
+        position: LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!),
+        anchor: const Offset(0.5, 0.5),
+        zIndex: 99));
+
+    if (_direction == 1) {
+      _addBusMarker(_busLocation1);
+      var index = 1;
+      for (var stop in _stopList1) {
+        _addStopMarker(LatLng(stop['StopPosition']['PositionLat'], stop['StopPosition']['PositionLon']),
+            stop['StopName']['Zh_tw'], index);
+        index++;
+      }
+    } else {
+      _addBusMarker(_busLocation0);
+      var index = 1;
+      for (var stop in _stopList0) {
+        _addStopMarker(LatLng(stop['StopPosition']['PositionLat'], stop['StopPosition']['PositionLon']),
+            stop['StopName']['Zh_tw'], index);
+        index++;
+      }
+    }
 
     setState(() {
       _tracking = false;
@@ -452,18 +566,17 @@ class _BusConfirmState extends State<BusConfirm> {
                     developer.log(snapshot.toString(), name: 'snapshot');
 
                     if (snapshot.hasError) {
-                      // 请求失败，显示错误
                       return Text("Error: ${snapshot.error}");
                     } else {
-                      // 请求成功，显示数据
                       return GoogleMap(
                         onMapCreated: _onMapCreated,
                         compassEnabled: false,
                         zoomControlsEnabled: false,
+                        mapToolbarEnabled: false,
                         // zoomGesturesEnabled: false,
                         // scrollGesturesEnabled: false,
                         rotateGesturesEnabled: false,
-                        markers: Set<Marker>.of(markers.values),
+                        markers: markers,
                         polylines: Set<Polyline>.of(polylines.values),
                         circles: circles,
                         // padding: const EdgeInsets.fromLTRB(0, 320, 0, 0),
@@ -477,7 +590,7 @@ class _BusConfirmState extends State<BusConfirm> {
                       // return Text("Contents: ${snapshot.data}");
                     }
                   } else {
-                    // 请求未结束，显示loading
+                    // loading
                     return Container(
                       decoration: BoxDecoration(
                         color: Colors.grey[300],
@@ -489,32 +602,6 @@ class _BusConfirmState extends State<BusConfirm> {
                   }
                 }),
           ),
-
-          //Loading Widget
-          /*
-          Positioned.fill(
-            child: Visibility(
-              visible: loading,
-              child: AnimatedOpacity(
-                curve: Curves.easeInCirc,
-                duration: const Duration(milliseconds: 500),
-                opacity: showMap ? 0 : 1,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                  ),
-                  child: const Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                ),
-                onEnd: () {
-                  loading = false;
-                  setState(() {});
-                },
-              ),
-            ),
-          ),
-          */
 
           //Bottom Widgets
           Positioned(
@@ -565,9 +652,39 @@ class _BusConfirmState extends State<BusConfirm> {
                                       Material(
                                         type: MaterialType.transparency,
                                         child: InkWell(
-                                          customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                                          customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
                                           child: Padding(
-                                            padding: const EdgeInsets.all(20.0),
+                                            padding: const EdgeInsets.fromLTRB(10, 20, 10, 20),
+                                            child: Icon(
+                                              Icons.swap_horiz,
+                                              color: Theme.of(context).colorScheme.onSecondaryContainer,
+                                              size: 24.0,
+                                            ),
+                                          ),
+                                          onTap: () => reverseOnTap(),
+                                        ),
+                                      ),
+                                      Material(
+                                        type: MaterialType.transparency,
+                                        child: InkWell(
+                                          customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+                                          child: Padding(
+                                            padding: const EdgeInsets.fromLTRB(10, 20, 10, 20),
+                                            child: Icon(
+                                              Icons.autorenew,
+                                              color: Theme.of(context).colorScheme.onSecondaryContainer,
+                                              size: 24.0,
+                                            ),
+                                          ),
+                                          onTap: () => refreshOmTap(),
+                                        ),
+                                      ),
+                                      Material(
+                                        type: MaterialType.transparency,
+                                        child: InkWell(
+                                          customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+                                          child: Padding(
+                                            padding: const EdgeInsets.fromLTRB(10, 20, 10.0, 20),
                                             child: Icon(
                                               _faved ? Icons.favorite_outlined : Icons.favorite_border_outlined,
                                               color: _faved
@@ -578,6 +695,9 @@ class _BusConfirmState extends State<BusConfirm> {
                                           ),
                                           onTap: () => favOnTap(),
                                         ),
+                                      ),
+                                      const SizedBox(
+                                        width: 10,
                                       ),
                                     ],
                                   ),
