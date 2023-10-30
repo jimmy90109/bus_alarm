@@ -2,18 +2,32 @@
 
 藉由實時的手機定位資訊，不會再因為塞車而需要再設另一個鬧鐘、到站時的連續震動除非使用者關閉，否則會繼續震動，確保使用者已經確實從睡夢中清醒過來，讓通勤族不會再睡得提心吊膽，大大提升在交通工具上的睡眠品質。  
 
---------------------  
 
-## UI設計  ： <a href="https://www.figma.com/proto/clo1boyJskf7hxhSgp7uKp/%E5%88%B0%E7%AB%99%E6%8F%90%E9%86%92APP?page-id=0%3A1&node-id=212-80&viewport=-10%2C-632%2C0.71&scaling=scale-down&starting-point-node-id=3%3A4/">Figma</a>  
+## 開發工具
+- Figma
+- Flutter
+- Google Cloud
+  - Maps SDK
+  - Directions API
+  - Geolocation API
+  - Place API
+- Transport Data eXchange
+  - Bus/RealTimeByFrequency API
+  - Bus/EstimatedTimeOfArrival API
+  - Bus/StopOfRoute API
+
+
+
+## UI設計  
 搜尋目的地 -> 開始追蹤 -> 到達範圍開始震動手機    
-<img src="./ScreenShots/UI.png" width = 600px>
+<img src="./ScreenShots/UI.png" width = 600px>  
+🔗<a href="https://www.figma.com/proto/clo1boyJskf7hxhSgp7uKp/%E5%88%B0%E7%AB%99%E6%8F%90%E9%86%92APP?page-id=0%3A1&node-id=212-80&viewport=-10%2C-632%2C0.71&scaling=scale-down&starting-point-node-id=3%3A4/">www.figma.com/proto</a>  
 
 
 
 
---------------------  
 
-## Flutter實作：  
+## Flutter實作
 4/9   
 完成基本UI、GoogleMap嵌入、PlaceAPI串接
 <table>
@@ -69,7 +83,7 @@
   </tr>
 </table>
 
----
+
 
 ## SQLite：
 
