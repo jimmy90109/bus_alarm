@@ -6,6 +6,8 @@
 ## 開發工具
 - Figma
 - Flutter
+- Firebase
+  - Authentication
 - Google Cloud
   - Maps SDK
   - Directions API
