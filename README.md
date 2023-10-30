@@ -27,18 +27,6 @@ Flutter實作：
     <td align="center">• 確認頁面</td>
     <!--<td align="center">• 新增項目<br>(正負分別代表收入和支出)</td>-->
   </tr>
-  <!--
-  <tr>
-    <td><img src="./ScreenShots/DatePicker.jpg" width = 150px ></td>
-    <td><img src="./ScreenShots/noBlank.jpg" width = 150px></td>
-    <td><img src="./ScreenShots/deleteItem.jpg" width = 150px></td>
-  </tr>
-  <tr>
-    <td align="center">• DatePicker</td>
-    <td align="center">• 欄位不可為空白</td>
-    <td align="center">• 點擊項目可以刪除</td>
-  </tr>
-  -->
 </table>
 7/6
 <table>
@@ -54,17 +42,19 @@ Flutter實作：
     <td align="center">• 確認頁面</td>
     <td align="center">• 追蹤中</td>
   </tr>
-  <!--
-  <tr>
-    <td><img src="./ScreenShots/DatePicker.jpg" width = 150px ></td>
-    <td><img src="./ScreenShots/noBlank.jpg" width = 150px></td>
-    <td><img src="./ScreenShots/deleteItem.jpg" width = 150px></td>
-  </tr>
-  <tr>
-    <td align="center">• DatePicker</td>
-    <td align="center">• 欄位不可為空白</td>
-    <td align="center">• 點擊項目可以刪除</td>
-  </tr>
-  -->
 </table>
-
+7/6
+<table>
+  <tr>
+    <td><img src="./ScreenShots/locationPermission.png" width = 150px ></td>
+    <td><img src="./ScreenShots/busSearching.png" width = 150px></td>
+    <td><img src="./ScreenShots/busConfirming.png" width = 150px></td>
+    <td><img src="./ScreenShots/arrived.png" width = 150px></td>
+  </tr>
+  <tr>
+    <td align="center">• 定位權限</td>
+    <td align="center">• 搜尋公車</td>
+    <td align="center">• 選取站牌</td>
+    <td align="center">• 已抵達</td>
+  </tr>
+</table>
