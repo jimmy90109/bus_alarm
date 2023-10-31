@@ -6,7 +6,8 @@ import 'dart:developer' as developer;
 import 'package:vibration/vibration.dart';
 
 class Arrived extends StatefulWidget {
-  const Arrived({super.key});
+  String placeName;
+  Arrived({super.key, required this.placeName});
 
   @override
   State<Arrived> createState() => _ArrivedState();
@@ -32,7 +33,7 @@ class _ArrivedState extends State<Arrived> {
   void dispose() {
     developer.log("canceled", name: "vibration");
     vibrating = false;
-    Vibration.cancel();
+    // Vibration.cancel();
     super.dispose();
   }
 
@@ -42,14 +43,21 @@ class _ArrivedState extends State<Arrived> {
         body: Container(
       color: Theme.of(context).colorScheme.primaryContainer,
       child: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(0, 50, 0, 50),
+        minimum: const EdgeInsets.fromLTRB(0, 75, 0, 50),
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             // mainAxisSize: MainAxisSize.max,
             // mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text("place name"),
+              Text(
+                widget.placeName,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
+              ),
               Column(
                 children: [
                   Transform.rotate(
@@ -85,7 +93,7 @@ class _ArrivedState extends State<Arrived> {
                           // width: 60,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(30),
-                            color: Theme.of(context).colorScheme.secondaryContainer,
+                            color: Theme.of(context).colorScheme.tertiaryContainer,
                           ),
                           child: Center(
                             child: Row(
@@ -109,14 +117,7 @@ class _ArrivedState extends State<Arrived> {
                           ),
                         ),
                         onTap: () {
-                          Vibration.cancel();
-                          developer.log("canceled", name: "vibration");
-                          vibrating = false;
-                          Navigator.pushAndRemoveUntil<void>(
-                            context,
-                            FadePageRoute(const Home()),
-                            ModalRoute.withName('/'),
-                          );
+                          Navigator.popUntil(context, ModalRoute.withName('/'));
                         })),
               ),
             ],

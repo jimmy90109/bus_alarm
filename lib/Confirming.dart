@@ -21,11 +21,7 @@ class Confirming extends StatefulWidget {
   final double place_lng;
 
   const Confirming(
-      {super.key,
-      required this.place_name,
-      required this.place_id,
-      required this.place_lat,
-      required this.place_lng});
+      {super.key, required this.place_name, required this.place_id, required this.place_lat, required this.place_lng});
 
   @override
   State<Confirming> createState() => _ConfirmingState();
@@ -66,8 +62,7 @@ class _ConfirmingState extends State<Confirming> {
     });
 
     _center = LatLng(widget.place_lat, widget.place_lng);
-    _addMarker(LatLng(widget.place_lat, widget.place_lng), "destination",
-        BitmapDescriptor.defaultMarker);
+    _addMarker(LatLng(widget.place_lat, widget.place_lng), "destination", BitmapDescriptor.defaultMarker);
     addCustomIcon();
     circles = {
       Circle(
@@ -117,20 +112,13 @@ class _ConfirmingState extends State<Confirming> {
 
   _addMarker(LatLng position, String id, BitmapDescriptor descriptor) {
     MarkerId markerId = MarkerId(id);
-    Offset offset =
-        id == "user" ? const Offset(0.5, 0.5) : const Offset(0.5, 1.0);
-    Marker marker = Marker(
-        markerId: markerId,
-        icon: descriptor,
-        position: position,
-        anchor: offset);
+    Offset offset = id == "user" ? const Offset(0.5, 0.5) : const Offset(0.5, 1.0);
+    Marker marker = Marker(markerId: markerId, icon: descriptor, position: position, anchor: offset);
     markers[markerId] = marker;
   }
 
   void addCustomIcon() {
-    BitmapDescriptor.fromAssetImage(
-            const ImageConfiguration(), "assets/bus.png")
-        .then(
+    BitmapDescriptor.fromAssetImage(const ImageConfiguration(), "assets/bus.png").then(
       (icon) {
         setState(() {
           markerIcon = icon;
@@ -141,11 +129,7 @@ class _ConfirmingState extends State<Confirming> {
 
   _addPolyLine() {
     PolylineId id = const PolylineId("poly");
-    Polyline polyline = Polyline(
-        polylineId: id,
-        color: Colors.grey.shade600,
-        points: polylineCoordinates,
-        width: 5);
+    Polyline polyline = Polyline(polylineId: id, color: Colors.grey.shade600, points: polylineCoordinates, width: 5);
     polylines[id] = polyline;
     setState(() {});
   }
@@ -188,12 +172,9 @@ class _ConfirmingState extends State<Confirming> {
           developer.log("location updated!", name: 'location');
           _currentLocation = newLoc;
           if (Geolocator.distanceBetween(
-                  _currentLocation!.latitude!,
-                  _currentLocation!.longitude!,
-                  widget.place_lat,
-                  widget.place_lng) <
+                  _currentLocation!.latitude!, _currentLocation!.longitude!, widget.place_lat, widget.place_lng) <
               500) {
-            Navigator.of(context).push(FadePageRoute(const Arrived()));
+            Navigator.of(context).push(FadePageRoute(Arrived(placeName: widget.place_name)));
           }
           updatedGPS(newLoc);
           setState(() {});
@@ -208,18 +189,15 @@ class _ConfirmingState extends State<Confirming> {
 
     //custoer: bus
     markers.remove(const MarkerId("user"));
-    _addMarker(
-        LatLng(location.latitude!, location.longitude!), "user", markerIcon);
+    _addMarker(LatLng(location.latitude!, location.longitude!), "user", markerIcon);
 
     //calculate the compass
-    double calculatedRotation = Geolocator.bearingBetween(location.latitude!,
-        location.longitude!, widget.place_lat, widget.place_lng);
+    double calculatedRotation =
+        Geolocator.bearingBetween(location.latitude!, location.longitude!, widget.place_lat, widget.place_lng);
 
     //let the map move down a bit
-    double calculatedLat =
-        (widget.place_lat - location.latitude!) * 0.2 + location.latitude!;
-    double calculatedLng =
-        (widget.place_lng - location.longitude!) * 0.2 + location.longitude!;
+    double calculatedLat = (widget.place_lat - location.latitude!) * 0.2 + location.latitude!;
+    double calculatedLng = (widget.place_lng - location.longitude!) * 0.2 + location.longitude!;
 
     //new CameraPosition
     mapController.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
@@ -254,6 +232,11 @@ class _ConfirmingState extends State<Confirming> {
   }
 
   startTracking() {
+    if (Geolocator.distanceBetween(
+            _currentLocation!.latitude!, _currentLocation!.longitude!, widget.place_lat, widget.place_lng) <
+        500) {
+      Navigator.of(context).push(FadePageRoute(Arrived(placeName: widget.place_name)));
+    }
     updatedGPS(_currentLocation!);
     _getPolyline();
     setState(() {
@@ -356,13 +339,10 @@ class _ConfirmingState extends State<Confirming> {
                                 width: MediaQuery.of(context).size.width - 30,
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(32),
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .surfaceVariant,
+                                  color: Theme.of(context).colorScheme.surfaceVariant,
                                 ),
                                 child: Padding(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(20, 0, 0, 0),
+                                  padding: const EdgeInsets.fromLTRB(20, 0, 0, 0),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.start,
                                     children: <Widget>[
@@ -371,30 +351,21 @@ class _ConfirmingState extends State<Confirming> {
                                           widget.place_name,
                                           style: TextStyle(
                                             fontSize: 20,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSecondaryContainer,
+                                            color: Theme.of(context).colorScheme.onSecondaryContainer,
                                           ),
                                         ),
                                       ),
                                       Material(
                                         type: MaterialType.transparency,
                                         child: InkWell(
-                                          customBorder: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(30)),
+                                          customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                                           child: Padding(
                                             padding: const EdgeInsets.all(20.0),
                                             child: Icon(
-                                              _faved
-                                                  ? Icons.favorite_outlined
-                                                  : Icons
-                                                      .favorite_border_outlined,
+                                              _faved ? Icons.favorite_outlined : Icons.favorite_border_outlined,
                                               color: _faved
                                                   ? Colors.red[700]
-                                                  : Theme.of(context)
-                                                      .colorScheme
-                                                      .onSecondaryContainer,
+                                                  : Theme.of(context).colorScheme.onSecondaryContainer,
                                               size: 24.0,
                                             ),
                                           ),
@@ -413,9 +384,7 @@ class _ConfirmingState extends State<Confirming> {
                     height: 10,
                   ),
                   AnimatedCrossFade(
-                    crossFadeState: !_tracking
-                        ? CrossFadeState.showFirst
-                        : CrossFadeState.showSecond,
+                    crossFadeState: !_tracking ? CrossFadeState.showFirst : CrossFadeState.showSecond,
                     duration: const Duration(milliseconds: 400),
                     firstCurve: Curves.fastOutSlowIn,
                     secondCurve: Curves.fastOutSlowIn,
@@ -435,23 +404,18 @@ class _ConfirmingState extends State<Confirming> {
                                   height: 60,
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(30),
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .primaryContainer,
+                                    color: Theme.of(context).colorScheme.primaryContainer,
                                   ),
                                   child: Center(
                                     child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
+                                      mainAxisAlignment: MainAxisAlignment.center,
                                       children: <Widget>[
                                         // Hero(
                                         //   tag: 'sIcon',
                                         //   child:
                                         Icon(
                                           Icons.check,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onPrimaryContainer,
+                                          color: Theme.of(context).colorScheme.onPrimaryContainer,
                                           size: 24.0,
                                         ),
                                         //),
@@ -460,9 +424,7 @@ class _ConfirmingState extends State<Confirming> {
                                           '確認',
                                           style: TextStyle(
                                             fontSize: 18,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onPrimaryContainer,
+                                            color: Theme.of(context).colorScheme.onPrimaryContainer,
                                           ),
                                         ),
                                       ],
@@ -514,16 +476,12 @@ class _ConfirmingState extends State<Confirming> {
                                 width: 60,
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(30),
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .surfaceVariant,
+                                  color: Theme.of(context).colorScheme.surfaceVariant,
                                 ),
                                 child: Center(
                                   child: Icon(
                                     Icons.cancel_outlined,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSecondaryContainer,
+                                    color: Theme.of(context).colorScheme.onSecondaryContainer,
                                     size: 24.0,
                                   ),
                                 ),
@@ -565,9 +523,7 @@ class _ConfirmingState extends State<Confirming> {
                             height: 60,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(30),
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primaryContainer,
+                              color: Theme.of(context).colorScheme.primaryContainer,
                             ),
                             child: Center(
                               child: Row(
@@ -578,9 +534,7 @@ class _ConfirmingState extends State<Confirming> {
                                   //   child:
                                   Icon(
                                     Icons.cancel_outlined,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onPrimaryContainer,
+                                    color: Theme.of(context).colorScheme.onPrimaryContainer,
                                     size: 24.0,
                                   ),
                                   //),
@@ -589,9 +543,7 @@ class _ConfirmingState extends State<Confirming> {
                                     '取消',
                                     style: TextStyle(
                                       fontSize: 18,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onPrimaryContainer,
+                                      color: Theme.of(context).colorScheme.onPrimaryContainer,
                                     ),
                                   ),
                                 ],
