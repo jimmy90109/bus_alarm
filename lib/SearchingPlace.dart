@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:custom_sliding_segmented_control/custom_sliding_segmented_control.dart';
 import 'package:flutter/material.dart';
+import 'package:google_map/BusConfirm.dart';
 import 'package:google_map/Confirming.dart';
+import 'package:location/location.dart';
 import 'package:uuid/uuid.dart';
 import 'package:http/http.dart' as http;
 import 'dart:developer' as developer;
@@ -10,7 +12,11 @@ import 'dart:developer' as developer;
 import 'animation/RouteAnimation.dart';
 
 class SearchingPlace extends StatefulWidget {
-  const SearchingPlace({super.key});
+  final LocationData currentLocation;
+  const SearchingPlace({
+    super.key,
+    required this.currentLocation,
+  });
 
   @override
   State<SearchingPlace> createState() => _SearchingPlaceState();
@@ -18,7 +24,7 @@ class SearchingPlace extends StatefulWidget {
 
 class _SearchingPlaceState extends State<SearchingPlace> {
   late FocusNode focusNode = FocusNode();
-  // TextEditingController tc = TextEditingController();
+  TextEditingController txcontroller = TextEditingController();
 
   //for place autoComplete
   final String _gAPI = "AIzaSyBu6yKj0QDgRglC0Ns-yx_FIUgGBOueh4Q";
@@ -34,7 +40,6 @@ class _SearchingPlaceState extends State<SearchingPlace> {
 
   //place or bus
   late int searchMode;
-
 
   @override
   void initState() {
@@ -54,53 +59,50 @@ class _SearchingPlaceState extends State<SearchingPlace> {
   }
 
   void getSuggestion(String input) async {
-    if(searchMode ==1){
-    String baseURL = "https://maps.googleapis.com/maps/api/place/autocomplete/json";
-    String request = '$baseURL'
-        '?input=$input'
-        '&key=$_gAPI'
-        '&sessiontoken=$_sessionToken'
-        '&region=tw'
-        '&language=zh-TW';
-    var response = await http.get(Uri.parse(request));
-    // developer.log(json.decode(response.body).toString(), name: 'placeAPI');
-    if (response.statusCode == 200) {
-      setState(() {
-        _placeList = json.decode(response.body)['predictions'];
-      });
-    } else {
-      throw Exception('Failed to load place predictions');
-    }}
+    if (searchMode == 1) {
+      String baseURL = "https://maps.googleapis.com/maps/api/place/autocomplete/json";
+      String request = '$baseURL'
+          '?input=$input'
+          '&key=$_gAPI'
+          '&sessiontoken=$_sessionToken'
+          '&region=tw'
+          '&language=zh-TW';
+      var response = await http.get(Uri.parse(request));
+      developer.log(json.decode(response.body).toString(), name: 'placeAPI');
+      if (response.statusCode == 200) {
+        setState(() {
+          _placeList = json.decode(response.body)['predictions'];
+        });
+      } else {
+        throw Exception('Failed to load place predictions');
+      }
+    }
 
-    if(searchMode ==2){
+    if (searchMode == 2) {
       //TODO busAPI
-
-      if(busToken.isNotEmpty) {
-        var uri = Uri.parse('https://tdx.transportdata.tw/api/basic/v2/Bus/Route/City/Taipei/$input?%24top=30&%24format=JSON');
+      if (busToken.isNotEmpty) {
+        var uri = Uri.parse(
+            'https://tdx.transportdata.tw/api/basic/v2/Bus/Route/City/Taipei/$input?%24top=20&%24format=JSON');
         var response = await http.get(uri, headers: {'authorization': "Bearer $busToken"});
         if (response.statusCode == 200) {
-          developer.log(json.decode(response.body).toString());
+          developer.log("got response of bus searching");
           setState(() {
             _placeList = json.decode(response.body);
           });
         } else {
-          //token not found
+          //token expired
           developer.log(json.decode(response.body).toString());
-          /*
-
-           */
+          getBusToken();
         }
-      }
-      else{
+      } else {
         //no token
         getBusToken();
       }
     }
   }
 
-
   // Future<String>
-  void getBusToken() async{
+  void getBusToken() async {
     final response = await http.post(
       Uri.parse("https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token"),
       headers: {'content-type': 'application/x-www-form-urlencoded'},
@@ -110,7 +112,9 @@ class _SearchingPlaceState extends State<SearchingPlace> {
         'client_secret': 'b5cc7437-c27f-4476-9401-ac87fc4cdf07'
       },
     );
-    developer.log(json.decode(response.body).toString());
+    developer.log("got busToken");
+    // developer.log(json.decode(response.body).toString(), name: 'busToken');
+
     setState(() {
       busToken = json.decode(response.body)['access_token'];
     });
@@ -166,8 +170,9 @@ class _SearchingPlaceState extends State<SearchingPlace> {
                         borderRadius: BorderRadius.circular(25),
                       ),
                       onValueChanged: (v) {
-                        if(v == 2){
-                          if(busToken.isEmpty){
+                        txcontroller.clear();
+                        if (v == 2) {
+                          if (busToken.isEmpty) {
                             getBusToken();
                           }
                         }
@@ -208,26 +213,24 @@ class _SearchingPlaceState extends State<SearchingPlace> {
                                             color: Theme.of(context).colorScheme.onPrimaryContainer,
                                             size: 24.0,
                                           ),
-                                          title: Text(_placeList[index]["structured_formatting"]
-                                              ["main_text"]),
+                                          title: Text(_placeList[index]["structured_formatting"]["main_text"]),
                                           onTap: () async {
                                             FocusManager.instance.primaryFocus?.unfocus();
                                             final placeId = _placeList[index]["place_id"];
                                             // print(placeId);
-                                            var response = await http.get(Uri.parse(
-                                                'https://maps.googleapis.com/maps/api/place/details/json'
-                                                '?place_id=$placeId'
-                                                '&language=zh-TW'
-                                                '&fields=place_id,name,geometry'
-                                                '&key=$_gAPI'));
+                                            var response = await http
+                                                .get(Uri.parse('https://maps.googleapis.com/maps/api/place/details/json'
+                                                    '?place_id=$placeId'
+                                                    '&language=zh-TW'
+                                                    '&fields=place_id,name,geometry'
+                                                    '&key=$_gAPI'));
                                             if (response.statusCode == 200) {
                                               var place = json.decode(response.body)['result'];
                                               Navigator.of(context).push(FadePageRoute(Confirming(
                                                   place_name: place['name'],
                                                   place_id: place['place_id'],
                                                   place_lat: place['geometry']['location']['lat'],
-                                                  place_lng: place['geometry']['location']
-                                                      ['lng'])));
+                                                  place_lng: place['geometry']['location']['lng'])));
                                             } else {
                                               throw Exception('Failed to load predictions');
                                             }
@@ -243,9 +246,6 @@ class _SearchingPlaceState extends State<SearchingPlace> {
                               : const Center(
                                   child: Text("(搜尋地點)"),
                                 )
-
-
-
                           : searchMode == 2
                               ? _placeList.isNotEmpty
                                   ? ListView.separated(
@@ -266,42 +266,32 @@ class _SearchingPlaceState extends State<SearchingPlace> {
                                             child: ListTile(
                                               leading: Icon(
                                                 Icons.place,
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .onPrimaryContainer,
+                                                color: Theme.of(context).colorScheme.onPrimaryContainer,
                                                 size: 24.0,
                                               ),
-                                              title: Text(_placeList[index]["RouteName"]
-                                                  ["Zh_tw"]),
+                                              title: Text(_placeList[index]["RouteName"]["Zh_tw"]),
                                               onTap: () async {
                                                 //TODO
-
-                                                /*
-
                                                 FocusManager.instance.primaryFocus?.unfocus();
-                                                final placeId = _placeList[index]["place_id"];
-                                                // print(placeId);
-                                                var response = await http.get(Uri.parse(
-                                                    'https://maps.googleapis.com/maps/api/place/details/json'
-                                                    '?place_id=$placeId'
-                                                    '&language=zh-TW'
-                                                    '&fields=place_id,name,geometry'
-                                                    '&key=$_gAPI'));
-                                                if (response.statusCode == 200) {
-                                                  var place = json.decode(response.body)['result'];
-                                                  Navigator.of(context).push(FadePageRoute(
-                                                      Confirming(
-                                                          place_name: place['name'],
-                                                          place_id: place['place_id'],
-                                                          place_lat: place['geometry']['location']
-                                                              ['lat'],
-                                                          place_lng: place['geometry']['location']
-                                                              ['lng'])));
-                                                } else {
-                                                  throw Exception('Failed to load predictions');
-                                                }
 
-                                                 */
+                                                // final placeId = _placeList[index]["place_id"];
+                                                // print(placeId);
+                                                // var response = await http.get(Uri.parse(
+                                                //     'https://maps.googleapis.com/maps/api/place/details/json'
+                                                //     '?place_id=$placeId'
+                                                //     '&language=zh-TW'
+                                                //     '&fields=place_id,name,geometry'
+                                                //     '&key=$_gAPI'));
+                                                // if (response.statusCode == 200) {
+                                                //   var place = json.decode(response.body)['result'];
+                                                Navigator.of(context).push(FadePageRoute(BusConfirm(
+                                                  bus_route: _placeList[index]["RouteName"]["Zh_tw"],
+                                                  bus_token: busToken,
+                                                  lastLocation: widget.currentLocation,
+                                                )));
+                                                // } else {
+                                                //   throw Exception('Failed to load predictions');
+                                                // }
                                               },
                                             ),
                                           ),
@@ -331,6 +321,7 @@ class _SearchingPlaceState extends State<SearchingPlace> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: TextField(
+                              controller: txcontroller,
                               cursorHeight: 20,
                               focusNode: focusNode,
                               // controller: tc,

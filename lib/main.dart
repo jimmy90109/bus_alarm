@@ -3,6 +3,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_map/Arrived.dart';
 import 'package:google_map/SearchingPlace.dart';
 import 'package:google_map/database/place_database.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -14,15 +15,16 @@ import 'animation/RouteAnimation.dart';
 import 'model/place.dart';
 import 'dart:developer' as developer;
 
-class MyHttpOverrides extends HttpOverrides{
-  @override
-  HttpClient createHttpClient(SecurityContext? context){
-    return super.createHttpClient(context)
-      ..badCertificateCallback = (X509Certificate cert, String host, int port)=> true;
-  }
-}
+// class MyHttpOverrides extends HttpOverrides {
+//   @override
+//   HttpClient createHttpClient(SecurityContext? context) {
+//     return super.createHttpClient(context)
+//       ..badCertificateCallback =
+//           (X509Certificate cert, String host, int port) => true;
+//   }
+// }
 
-void main() async{
+void main() async {
   //transparent the notification & navigation bar
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     systemNavigationBarColor: Colors.transparent,
@@ -32,21 +34,22 @@ void main() async{
   ));
 
   //api bind
-  HttpOverrides.global = MyHttpOverrides();
+  // HttpOverrides.global = MyHttpOverrides();
 
-  runApp(const MyApp());
+  runApp(const Home());
 }
 
-class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+class Home extends StatefulWidget {
+  const Home({super.key});
 
   @override
-  createState() => _MyAppState();
+  createState() => _HomeState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _HomeState extends State<Home> {
   //dynamic theme
-  static final _defaultLightColorScheme = ColorScheme.fromSeed(seedColor: const Color(0xFFD2E2FC));
+  static final _defaultLightColorScheme =
+      ColorScheme.fromSeed(seedColor: const Color(0xFFD2E2FC));
 
   //siding up panel controller
   final PanelController _pc = PanelController();
@@ -104,8 +107,8 @@ class _MyAppState extends State<MyApp> {
         } else {
           _lastLocation = _currentLocation;
           _currentLocation = newLoc;
-          bearing = Geolocator.bearingBetween(_lastLocation!.latitude!, _lastLocation!.longitude!,
-              newLoc.latitude!, newLoc.longitude!);
+          bearing = Geolocator.bearingBetween(_lastLocation!.latitude!,
+              _lastLocation!.longitude!, newLoc.latitude!, newLoc.longitude!);
           setState(() {});
         }
         mapController.animateCamera(
@@ -146,7 +149,9 @@ class _MyAppState extends State<MyApp> {
     Vibration.vibrate(pattern: [500, 100, 100, 100, 500, 500]);
   }
 
-  headOnTap() {}
+  headOnTap() {
+    // Navigator.of(context).push(FadePageRoute(const Arrived()));
+  }
 
   recentPlacesOnTap() {
     readPlaces(hisTable);
@@ -196,7 +201,8 @@ class _MyAppState extends State<MyApp> {
                 backdropTapClosesPanel: true,
                 defaultPanelState: PanelState.CLOSED,
                 color: Theme.of(context).colorScheme.secondaryContainer,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(30)),
                 panelBuilder: (controller) => Panel(
                   scrollController: controller,
                   panelController: _pc,
@@ -251,32 +257,39 @@ class _MyAppState extends State<MyApp> {
                           ),
                         )),
                     Positioned(
-                      top: 10,
+                      top: 0,
                       left: 15,
                       right: 15,
                       child: SafeArea(
-                        minimum: const EdgeInsets.fromLTRB(0, 10, 0, 0),
+                        minimum: const EdgeInsets.fromLTRB(0, 30, 0, 0),
                         child: Material(
                           elevation: 20,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(32)),
                           child: Ink(
                               width: MediaQuery.of(context).size.width - 30,
                               height: 64,
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(32),
-                                color: Theme.of(context).colorScheme.primaryContainer,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primaryContainer,
                               ),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: <Widget>[
                                   InkWell(
                                     customBorder: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(32)),
+                                        borderRadius:
+                                            BorderRadius.circular(32)),
                                     child: Padding(
                                       padding: const EdgeInsets.all(20.0),
                                       child: Icon(
                                         Icons.menu,
-                                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onPrimaryContainer,
                                         size: 24.0,
                                       ),
                                     ),
@@ -286,17 +299,22 @@ class _MyAppState extends State<MyApp> {
                                     '公車鬧鐘',
                                     style: TextStyle(
                                       fontSize: 20,
-                                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onPrimaryContainer,
                                     ),
                                   ),
                                   InkWell(
                                     customBorder: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(30)),
+                                        borderRadius:
+                                            BorderRadius.circular(30)),
                                     child: Padding(
                                       padding: const EdgeInsets.all(20.0),
                                       child: Icon(
                                         Icons.account_circle_outlined,
-                                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onPrimaryContainer,
                                         size: 24.0,
                                       ),
                                     ),
@@ -312,123 +330,137 @@ class _MyAppState extends State<MyApp> {
                       left: 15,
                       right: 15,
                       child: SafeArea(
-                        minimum: const EdgeInsets.fromLTRB(0, 0, 0, 10),
-                        child: Column(children: <Widget>[
-
-                          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: <Widget>[
-                            Material(
-                                elevation: 20,
-                                shape:
-                                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                                child: InkWell(
-                                  customBorder: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30)),
-                                  child: Ink(
-                                    height: 60,
-                                    width: 60,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(30),
-                                      color: Theme.of(context).colorScheme.secondaryContainer,
-                                    ),
-                                    child: Center(
-                                      child: Icon(
-                                        Icons.access_time_outlined,
-                                        color: Theme.of(context).colorScheme.onSecondaryContainer,
-                                        size: 24.0,
-                                      ),
-                                    ),
-                                  ),
-                                  onTap: () => recentPlacesOnTap(),
-                                )),
-                            Hero(
-                              tag: 'searchingHero',
-                              child: Material(
+                        minimum: const EdgeInsets.only(bottom: 20),
+                        child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: <Widget>[
+                              Material(
                                   elevation: 20,
-                                  //type: MaterialType.transparency,
-                                  //color: Colors.transparent,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
+                                      borderRadius: BorderRadius.circular(30)),
                                   child: InkWell(
                                     customBorder: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                    ),
-                                    child: Ink(
-                                      height: 60,
-                                      width: 180,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(30),
-                                        color: Theme.of(context).colorScheme.primaryContainer,
-                                      ),
-                                      child: Center(
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: <Widget>[
-                                            Icon(
-                                              Icons.search,
-                                              color:
-                                                  Theme.of(context).colorScheme.onPrimaryContainer,
-                                              size: 24.0,
-                                            ),
-                                            const SizedBox(width: 5),
-                                            Text(
-                                              '搜尋',
-                                              style: TextStyle(
-                                                fontSize: 18,
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .onPrimaryContainer,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    onTap: () => Navigator.of(context)
-                                        .push(SlidePageRoute(const SearchingPlace())),
-                                  )),
-                            ),
-                            Material(
-                                elevation: 20,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
-                                child: InkWell(
-                                    customBorder: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                    ),
+                                        borderRadius:
+                                            BorderRadius.circular(30)),
                                     child: Ink(
                                       height: 60,
                                       width: 60,
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(30),
-                                        color: Theme.of(context).colorScheme.secondaryContainer,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .secondaryContainer,
                                       ),
                                       child: Center(
                                         child: Icon(
-                                          Icons.favorite_border_outlined,
-                                          color: Theme.of(context).colorScheme.onSecondaryContainer,
+                                          Icons.access_time_outlined,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSecondaryContainer,
                                           size: 24.0,
                                         ),
                                       ),
                                     ),
-                                    onTap: () => favoritePlacesOnTap())),
-                          ])
-                        ]),
+                                    onTap: () => recentPlacesOnTap(),
+                                  )),
+                              Hero(
+                                tag: 'searchingHero',
+                                child: Material(
+                                    elevation: 20,
+                                    //type: MaterialType.transparency,
+                                    //color: Colors.transparent,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(30),
+                                    ),
+                                    child: InkWell(
+                                      customBorder: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(30),
+                                      ),
+                                      child: Ink(
+                                        height: 60,
+                                        width: 180,
+                                        decoration: BoxDecoration(
+                                          borderRadius:
+                                              BorderRadius.circular(30),
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primaryContainer,
+                                        ),
+                                        child: Center(
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: <Widget>[
+                                              Icon(
+                                                Icons.search,
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onPrimaryContainer,
+                                                size: 24.0,
+                                              ),
+                                              const SizedBox(width: 5),
+                                              Text(
+                                                '搜尋',
+                                                style: TextStyle(
+                                                  fontSize: 18,
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .onPrimaryContainer,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      onTap: () => Navigator.of(context).push(
+                                          SlidePageRoute(
+                                              const SearchingPlace())),
+                                    )),
+                              ),
+                              Material(
+                                  elevation: 20,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  child: InkWell(
+                                      customBorder: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(30),
+                                      ),
+                                      child: Ink(
+                                        height: 60,
+                                        width: 60,
+                                        decoration: BoxDecoration(
+                                          borderRadius:
+                                              BorderRadius.circular(30),
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .secondaryContainer,
+                                        ),
+                                        child: Center(
+                                          child: Icon(
+                                            Icons.favorite_border_outlined,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSecondaryContainer,
+                                            size: 24.0,
+                                          ),
+                                        ),
+                                      ),
+                                      onTap: () => favoritePlacesOnTap())),
+                            ]),
                       ),
                     ),
                     Positioned.fill(
                         child: Center(
-                        child: AnimatedOpacity(
-                          curve: Curves.easeInCirc,
-                          duration: const Duration(milliseconds: 1000),
-                          opacity: _currentLocation == null ? 0 : 1,
-                          child: SizedBox(
-                              height: 350,
-                              width: MediaQuery.of(context).size.width,
-                              child: Center(child: Image.asset('assets/bus.png'))),
-                        )
-                    ))
+                            child: AnimatedOpacity(
+                      curve: Curves.easeInCirc,
+                      duration: const Duration(milliseconds: 1000),
+                      opacity: _currentLocation == null ? 0 : 1,
+                      child: SizedBox(
+                          height: 350,
+                          width: MediaQuery.of(context).size.width,
+                          child: Center(child: Image.asset('assets/bus.png'))),
+                    )))
                   ],
                 ),
               ),

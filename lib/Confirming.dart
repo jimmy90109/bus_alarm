@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:google_map/Arrived.dart';
+import 'package:google_map/animation/RouteAnimation.dart';
 import 'package:google_map/database/place_database.dart';
 import 'package:google_map/util/toast.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:location/location.dart';
-import 'util/map_util.dart';
+// import 'util/map_util.dart';
 import 'model/place.dart';
 import 'dart:developer' as developer;
 import 'package:geolocator/geolocator.dart';
@@ -40,16 +42,50 @@ class _ConfirmingState extends State<Confirming> {
   Set<Circle> circles = {};
   BitmapDescriptor markerIcon = BitmapDescriptor.defaultMarker;
   Map<MarkerId, Marker> markers = {};
-  Map<PolylineId, Polyline> polylines = {};
   List<LatLng> polylineCoordinates = [];
   PolylinePoints polylinePoints = PolylinePoints();
+  Map<PolylineId, Polyline> polylines = {};
   String googleAPiKey = "AIzaSyBu6yKj0QDgRglC0Ns-yx_FIUgGBOueh4Q";
 
   //plist
   late List<Place> _placeList;
   bool _faved = false;
 
-  Future readPlaces() async {
+  //get current location
+  Location location = Location();
+  LocationData? _currentLocation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    Future.delayed(const Duration(milliseconds: 250), () {
+      setState(() {
+        showMap = true;
+      });
+    });
+
+    _center = LatLng(widget.place_lat, widget.place_lng);
+    _addMarker(LatLng(widget.place_lat, widget.place_lng), "destination",
+        BitmapDescriptor.defaultMarker);
+    addCustomIcon();
+    circles = {
+      Circle(
+        circleId: const CircleId("destination"),
+        center: LatLng(widget.place_lat, widget.place_lng),
+        radius: 500,
+        strokeWidth: 0,
+        fillColor: Colors.grey.withOpacity(0.3),
+      )
+    };
+
+    getCurrentLocation();
+
+    readFavPlaces();
+    // checkFav();
+  }
+
+  Future readFavPlaces() async {
     _placeList = await PlacesDatabase.instance.readAllPlaces(favTable);
     setState(() {});
     developer.log(_placeList.toString(), name: 'placeFav');
@@ -58,12 +94,12 @@ class _ConfirmingState extends State<Confirming> {
 
   Future insertPlace(Place place) async {
     await PlacesDatabase.instance.create(favTable, place);
-    readPlaces();
+    readFavPlaces();
   }
 
   Future deletePlace(String id) async {
     await PlacesDatabase.instance.delete(favTable, id);
-    readPlaces();
+    readFavPlaces();
   }
 
   checkFav() {
@@ -79,46 +115,22 @@ class _ConfirmingState extends State<Confirming> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-
-    Future.delayed(const Duration(milliseconds: 250), () {
-      setState(() {
-        showMap = true;
-      });
-    });
-
-    _center = LatLng(widget.place_lat, widget.place_lng);
-    _addMarker(
-        LatLng(widget.place_lat, widget.place_lng), "destination", BitmapDescriptor.defaultMarker);
-    addCustomIcon();
-    circles = {
-      Circle(
-        circleId: const CircleId("destination"),
-        center: LatLng(widget.place_lat, widget.place_lng),
-        radius: 500,
-        strokeWidth: 0,
-        fillColor: Colors.grey.withOpacity(0.3),
-      )
-    };
-
-    getCurrentLocation();
-
-    readPlaces();
-    // checkFav();
-  }
-
   _addMarker(LatLng position, String id, BitmapDescriptor descriptor) {
     MarkerId markerId = MarkerId(id);
-    Offset offset = id == "user" ? const Offset(0.5, 0.5) : const Offset(0.5, 1.0);
-    Marker marker =
-        Marker(markerId: markerId, icon: descriptor, position: position, anchor: offset);
+    Offset offset =
+        id == "user" ? const Offset(0.5, 0.5) : const Offset(0.5, 1.0);
+    Marker marker = Marker(
+        markerId: markerId,
+        icon: descriptor,
+        position: position,
+        anchor: offset);
     markers[markerId] = marker;
   }
 
   void addCustomIcon() {
-    BitmapDescriptor.fromAssetImage(const ImageConfiguration(), "assets/bus.png").then(
+    BitmapDescriptor.fromAssetImage(
+            const ImageConfiguration(), "assets/bus.png")
+        .then(
       (icon) {
         setState(() {
           markerIcon = icon;
@@ -130,7 +142,10 @@ class _ConfirmingState extends State<Confirming> {
   _addPolyLine() {
     PolylineId id = const PolylineId("poly");
     Polyline polyline = Polyline(
-        polylineId: id, color: Colors.grey.shade600, points: polylineCoordinates, width: 5);
+        polylineId: id,
+        color: Colors.grey.shade600,
+        points: polylineCoordinates,
+        width: 5);
     polylines[id] = polyline;
     setState(() {});
   }
@@ -158,8 +173,6 @@ class _ConfirmingState extends State<Confirming> {
   }
 
   //get current location
-  Location location = Location();
-  LocationData? _currentLocation;
 
   void getCurrentLocation() async {
     location.getLocation().then(
@@ -169,12 +182,19 @@ class _ConfirmingState extends State<Confirming> {
     );
 
     await location.changeSettings(interval: 1000, distanceFilter: 50);
-
     location.onLocationChanged.listen(
       (newLoc) {
         if (_tracking) {
           developer.log("location updated!", name: 'location');
           _currentLocation = newLoc;
+          if (Geolocator.distanceBetween(
+                  _currentLocation!.latitude!,
+                  _currentLocation!.longitude!,
+                  widget.place_lat,
+                  widget.place_lng) <
+              500) {
+            Navigator.of(context).push(FadePageRoute(const Arrived()));
+          }
           updatedGPS(newLoc);
           setState(() {});
         }
@@ -185,18 +205,21 @@ class _ConfirmingState extends State<Confirming> {
   updatedGPS(LocationData location) {
     polylines.remove(const PolylineId("poly"));
     _getPolyline();
-    markers.remove(const MarkerId("user"));
 
     //custoer: bus
-    _addMarker(LatLng(location.latitude!, location.longitude!), "user", markerIcon);
+    markers.remove(const MarkerId("user"));
+    _addMarker(
+        LatLng(location.latitude!, location.longitude!), "user", markerIcon);
 
     //calculate the compass
-    double calculatedRotation = Geolocator.bearingBetween(
-        location.latitude!, location.longitude!, widget.place_lat, widget.place_lng);
+    double calculatedRotation = Geolocator.bearingBetween(location.latitude!,
+        location.longitude!, widget.place_lat, widget.place_lng);
 
     //let the map move down a bit
-    double calculatedLat = (widget.place_lat - location.latitude!) * 0.2 + location.latitude!;
-    double calculatedLng = (widget.place_lng - location.longitude!) * 0.2 + location.longitude!;
+    double calculatedLat =
+        (widget.place_lat - location.latitude!) * 0.2 + location.latitude!;
+    double calculatedLng =
+        (widget.place_lng - location.longitude!) * 0.2 + location.longitude!;
 
     //new CameraPosition
     mapController.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
@@ -209,12 +232,55 @@ class _ConfirmingState extends State<Confirming> {
     setState(() {});
   }
 
+  favOnTap() {
+    if (_faved) {
+      deletePlace(widget.place_id);
+      warning("已移除收藏！");
+      setState(() {
+        _faved = false;
+      });
+    } else {
+      insertPlace(Place(
+        id: widget.place_id,
+        name: widget.place_name,
+        lat: widget.place_lat,
+        lng: widget.place_lng,
+      ));
+      warning("已收藏地點！");
+      setState(() {
+        _faved = true;
+      });
+    }
+  }
+
+  startTracking() {
+    updatedGPS(_currentLocation!);
+    _getPolyline();
+    setState(() {
+      _tracking = true;
+    });
+  }
+
+  cancelTracking() {
+    polylines.remove(const PolylineId("poly"));
+    markers.remove(const MarkerId("user"));
+    setState(() {
+      _tracking = false;
+    });
+    mapController.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
+      target: _center,
+      zoom: 16.0,
+      bearing: 0,
+      tilt: 0,
+    )));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
-          //TODO
+          //Google Map
           Positioned.fill(
             child: GoogleMap(
               onMapCreated: _onMapCreated,
@@ -235,6 +301,8 @@ class _ConfirmingState extends State<Confirming> {
               ),
             ),
           ),
+
+          //Loading Widget
           Positioned.fill(
             child: Visibility(
               visible: loading,
@@ -257,13 +325,16 @@ class _ConfirmingState extends State<Confirming> {
               ),
             ),
           ),
+
+          //Bottom Widgets
           Positioned(
-            bottom: 5,
+            bottom: 0,
             left: 15,
             right: 15,
             child: SafeArea(
+              minimum: const EdgeInsets.fromLTRB(0, 0, 0, 30),
               child: Column(
-                children: [
+                children: <Widget>[
                   Visibility(
                     visible: !_tracking,
                     child: Row(children: <Widget>[
@@ -274,7 +345,7 @@ class _ConfirmingState extends State<Confirming> {
                             //type: MaterialType.transparency,
                             //color: Colors.transparent,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
+                              borderRadius: BorderRadius.circular(32),
                             ),
                             child: InkWell(
                               customBorder: RoundedRectangleBorder(
@@ -285,10 +356,13 @@ class _ConfirmingState extends State<Confirming> {
                                 width: MediaQuery.of(context).size.width - 30,
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(32),
-                                  color: Theme.of(context).colorScheme.surfaceVariant,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .surfaceVariant,
                                 ),
                                 child: Padding(
-                                  padding: const EdgeInsets.fromLTRB(20, 0, 0, 0),
+                                  padding:
+                                      const EdgeInsets.fromLTRB(20, 0, 0, 0),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.start,
                                     children: <Widget>[
@@ -297,8 +371,9 @@ class _ConfirmingState extends State<Confirming> {
                                           widget.place_name,
                                           style: TextStyle(
                                             fontSize: 20,
-                                            color:
-                                                Theme.of(context).colorScheme.onSecondaryContainer,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSecondaryContainer,
                                           ),
                                         ),
                                       ),
@@ -306,13 +381,15 @@ class _ConfirmingState extends State<Confirming> {
                                         type: MaterialType.transparency,
                                         child: InkWell(
                                           customBorder: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(30)),
+                                              borderRadius:
+                                                  BorderRadius.circular(30)),
                                           child: Padding(
                                             padding: const EdgeInsets.all(20.0),
                                             child: Icon(
                                               _faved
                                                   ? Icons.favorite_outlined
-                                                  : Icons.favorite_border_outlined,
+                                                  : Icons
+                                                      .favorite_border_outlined,
                                               color: _faved
                                                   ? Colors.red[700]
                                                   : Theme.of(context)
@@ -321,26 +398,7 @@ class _ConfirmingState extends State<Confirming> {
                                               size: 24.0,
                                             ),
                                           ),
-                                          onTap: () {
-                                            if (_faved) {
-                                              deletePlace(widget.place_id);
-                                              warning("已移除收藏！");
-                                              setState(() {
-                                                _faved = false;
-                                              });
-                                            } else {
-                                              insertPlace(Place(
-                                                id: widget.place_id,
-                                                name: widget.place_name,
-                                                lat: widget.place_lat,
-                                                lng: widget.place_lng,
-                                              ));
-                                              warning("已收藏地點！");
-                                              setState(() {
-                                                _faved = true;
-                                              });
-                                            }
-                                          },
+                                          onTap: () => favOnTap(),
                                         ),
                                       ),
                                     ],
@@ -354,214 +412,218 @@ class _ConfirmingState extends State<Confirming> {
                   const SizedBox(
                     height: 10,
                   ),
-                  Row(children: <Widget>[
-                    Expanded(
-                      child: AnimatedCrossFade(
-                        crossFadeState:
-                        !_tracking ? CrossFadeState.showFirst : CrossFadeState.showSecond,
-                        duration: const Duration(milliseconds: 400),
-                        firstCurve: Curves.fastOutSlowIn,
-                        secondCurve: Curves.fastOutSlowIn,
-                        firstChild: Row(
-                          children: [
-                            Expanded(
-                              child: Material(
-                                  elevation: 20,
-                                  //type: MaterialType.transparency,
-                                  //color: Colors.transparent,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                  child: InkWell(
-                                    customBorder: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                    ),
-                                    child: Ink(
-                                      height: 60,
-                                      // width: 180,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(30),
-                                        color: Theme.of(context).colorScheme.primaryContainer,
-                                      ),
-                                      child: Center(
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: <Widget>[
-                                            // Hero(
-                                            //   tag: 'sIcon',
-                                            //   child:
-                                            Icon(
-                                              Icons.check,
-                                              color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                              size: 24.0,
-                                            ),
-                                            //),
-                                            const SizedBox(width: 5),
-                                            Text(
-                                              '確認',
-                                              style: TextStyle(
-                                                fontSize: 18,
-                                                color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    onTap: () {
-                                      if (_tracking) {
-                                        polylines.remove(const PolylineId("poly"));
-                                        markers.remove(const MarkerId("user"));
-                                        setState(() {
-                                          _tracking = false;
-                                        });
-                                        mapController
-                                            .animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
-                                          target: _center,
-                                          zoom: 16.0,
-                                          bearing: 0,
-                                          tilt: 0,
-                                        )));
-                                        //TODO
-                                      } else {
-                                        //TODO
-                                        updatedGPS(_currentLocation!);
-                                        _getPolyline();
-                                        setState(() {
-                                          _tracking = true;
-                                        });
-                                      }
-                                    },
-                                  )),
-                            ),
-                            const SizedBox(
-                              width: 10,
-                            ),
-                            Material(
-                                elevation: 20,
-                                shape: RoundedRectangleBorder(
+                  AnimatedCrossFade(
+                    crossFadeState: !_tracking
+                        ? CrossFadeState.showFirst
+                        : CrossFadeState.showSecond,
+                    duration: const Duration(milliseconds: 400),
+                    firstCurve: Curves.fastOutSlowIn,
+                    secondCurve: Curves.fastOutSlowIn,
+                    firstChild: Row(
+                      children: [
+                        Expanded(
+                          child: Material(
+                              // elevation: 20,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              child: InkWell(
+                                customBorder: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(30),
                                 ),
-                                child: InkWell(
-                                  customBorder: RoundedRectangleBorder(
+                                child: Ink(
+                                  height: 60,
+                                  decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(30),
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primaryContainer,
                                   ),
-                                  child: Ink(
-                                    height: 60,
-                                    width: 60,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(30),
-                                      color: Theme.of(context).colorScheme.surfaceVariant,
-                                    ),
-                                    child: Center(
-                                      child: Icon(
-                                        Icons.cancel_outlined,
-                                        color: Theme.of(context).colorScheme.onSecondaryContainer,
-                                        size: 24.0,
-                                      ),
-                                    ),
-                                  ),
-                                  onTap: () {
-                                    if (_tracking) {
-                                      polylines.remove(const PolylineId("poly"));
-                                      markers.remove(const MarkerId("user"));
-                                      setState(() {
-                                        _tracking = false;
-                                      });
-                                      mapController
-                                          .animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
-                                        target: _center,
-                                        zoom: 16.0,
-                                        bearing: 0,
-                                        tilt: 0,
-                                      )));
-                                      //TODO
-                                    } else {
-                                    Navigator.pop(context);
-                                    }
-                                  },
-                                )),
-                          ],
-                        ),
-                        secondChild: Row(
-                          children: [
-                            Expanded(
-                              child: Material(
-                                  elevation: 20,
-                                  //type: MaterialType.transparency,
-                                  //color: Colors.transparent,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                  child: InkWell(
-                                    customBorder: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                    ),
-                                    child: Ink(
-                                      height: 60,
-                                      // width: 180,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(30),
-                                        color: Theme.of(context).colorScheme.primaryContainer,
-                                      ),
-                                      child: Center(
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: <Widget>[
-                                            // Hero(
-                                            //   tag: 'sIcon',
-                                            //   child:
-                                            Icon(
-                                              Icons.cancel_outlined,
-                                              color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                              size: 24.0,
-                                            ),
-                                            //),
-                                            const SizedBox(width: 5),
-                                            Text(
-                                              '取消',
-                                              style: TextStyle(
-                                                fontSize: 18,
-                                                color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                              ),
-                                            ),
-                                          ],
+                                  child: Center(
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: <Widget>[
+                                        // Hero(
+                                        //   tag: 'sIcon',
+                                        //   child:
+                                        Icon(
+                                          Icons.check,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onPrimaryContainer,
+                                          size: 24.0,
                                         ),
-                                      ),
+                                        //),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          '確認',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onPrimaryContainer,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    onTap: () {
-                                      if (_tracking) {
-                                        polylines.remove(const PolylineId("poly"));
-                                        markers.remove(const MarkerId("user"));
-                                        setState(() {
-                                          _tracking = false;
-                                        });
-                                        mapController
-                                            .animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
-                                          target: _center,
-                                          zoom: 16.0,
-                                          bearing: 0,
-                                          tilt: 0,
-                                        )));
-                                        //TODO
-                                      } else {
-                                        //TODO
-                                        updatedGPS(_currentLocation!);
-                                        _getPolyline();
-                                        setState(() {
-                                          _tracking = true;
-                                        });
-                                      }
-                                    },
-                                  )),
-                            ),
-                          ],
+                                  ),
+                                ),
+                                onTap: () => startTracking(),
+                                // {
+                                //   if (_tracking) {
+                                //     polylines.remove(const PolylineId("poly"));
+                                //     markers.remove(const MarkerId("user"));
+                                //     setState(() {
+                                //       _tracking = false;
+                                //     });
+                                //     mapController.animateCamera(
+                                //         CameraUpdate.newCameraPosition(
+                                //             CameraPosition(
+                                //       target: _center,
+                                //       zoom: 16.0,
+                                //       bearing: 0,
+                                //       tilt: 0,
+                                //     )));
+                                //     //TODO
+                                //   } else {
+                                //     //TODO
+                                //     updatedGPS(_currentLocation!);
+                                //     _getPolyline();
+                                //     setState(() {
+                                //       _tracking = true;
+                                //     });
+                                //   }
+                                // },
+                              )),
                         ),
-                      ),
+                        const SizedBox(
+                          width: 10,
+                        ),
+                        Material(
+                            // elevation: 20,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            child: InkWell(
+                              customBorder: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              child: Ink(
+                                height: 60,
+                                width: 60,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(30),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .surfaceVariant,
+                                ),
+                                child: Center(
+                                  child: Icon(
+                                    Icons.cancel_outlined,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSecondaryContainer,
+                                    size: 24.0,
+                                  ),
+                                ),
+                              ),
+                              onTap: () => Navigator.pop(context),
+                              // {
+                              //   if (_tracking) {
+                              //     polylines.remove(const PolylineId("poly"));
+                              //     markers.remove(const MarkerId("user"));
+                              //     setState(() {
+                              //       _tracking = false;
+                              //     });
+                              //     mapController.animateCamera(
+                              //         CameraUpdate.newCameraPosition(
+                              //             CameraPosition(
+                              //       target: _center,
+                              //       zoom: 16.0,
+                              //       bearing: 0,
+                              //       tilt: 0,
+                              //     )));
+                              //     //TODO
+                              //   } else {
+                              //     Navigator.pop(context);
+                              //   }
+                              // },
+                            )),
+                      ],
                     ),
-                  ]),
-                  const SizedBox(
-                    height: 10,
+                    secondChild: Material(
+                        // elevation: 20,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: InkWell(
+                          customBorder: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          child: Ink(
+                            height: 60,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(30),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primaryContainer,
+                            ),
+                            child: Center(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: <Widget>[
+                                  // Hero(
+                                  //   tag: 'sIcon',
+                                  //   child:
+                                  Icon(
+                                    Icons.cancel_outlined,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onPrimaryContainer,
+                                    size: 24.0,
+                                  ),
+                                  //),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    '取消',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onPrimaryContainer,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          onTap: () => cancelTracking(),
+                          // {
+                          //   if (_tracking) {
+                          //     polylines.remove(const PolylineId("poly"));
+                          //     markers.remove(const MarkerId("user"));
+                          //     setState(() {
+                          //       _tracking = false;
+                          //     });
+                          //     mapController.animateCamera(
+                          //         CameraUpdate.newCameraPosition(CameraPosition(
+                          //       target: _center,
+                          //       zoom: 16.0,
+                          //       bearing: 0,
+                          //       tilt: 0,
+                          //     )));
+                          //     //TODO
+                          //   } else {
+                          //     //TODO
+                          //     updatedGPS(_currentLocation!);
+                          //     _getPolyline();
+                          //     setState(() {
+                          //       _tracking = true;
+                          //     });
+                          //   }
+                          // },
+                        )),
                   ),
                 ],
               ),
