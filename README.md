@@ -8,6 +8,7 @@
 - Flutter
 - Firebase
   - Authentication
+  - Realtime Database
 - Google Cloud
   - Maps SDK
   - Directions API
@@ -82,6 +83,25 @@
     <td align="center">• 搜尋公車</td>
     <td align="center">• 選取站牌</td>
     <td align="center">• 已抵達</td>
+  </tr>
+</table>
+
+
+
+11/01   
+Firebase Authentication 會員登入系統
+<table>
+  <tr>
+    <td><img src="./ScreenShots/login.png" width = 150px ></td>
+    <td><img src="./ScreenShots/register.png" width = 150px></td>
+    <td><img src="./ScreenShots/forgotPassword.png" width = 150px></td>
+    <td><img src="./ScreenShots/profile.png" width = 150px></td>
+  </tr>
+  <tr>
+    <td align="center">• 登入</td>
+    <td align="center">• 註冊</td>
+    <td align="center">• 忘記密碼</td>
+    <td align="center">• 會員資料</td>
   </tr>
 </table>
 
