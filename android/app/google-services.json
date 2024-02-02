@@ -1,0 +1,56 @@
+{
+  "project_info": {
+    "project_number": "497223059110",
+    "firebase_url": "https://arrival-notification-2e6bb-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "arrival-notification-2e6bb",
+    "storage_bucket": "arrival-notification-2e6bb.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:497223059110:android:2bb070e111449c33159667",
+        "android_client_info": {
+          "package_name": "com.example.google_map"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "497223059110-djkkqi24aieo1ugsut17dou47419fc2l.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.google_map",
+            "certificate_hash": "6235181ac530cf90453b54af39a326de0b8a1490"
+          }
+        },
+        {
+          "client_id": "497223059110-dufsvtgarreu0i6l24d7225sde7oeebn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.google_map",
+            "certificate_hash": "42e70f4f9213937ac86755cff8d8ab029cc551ca"
+          }
+        },
+        {
+          "client_id": "497223059110-fkqmu8s74i8kjaljneu10crq1dekel37.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDANh8jwJg5flUoU6YI_0xVYpAXcwJRawA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "497223059110-fkqmu8s74i8kjaljneu10crq1dekel37.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
